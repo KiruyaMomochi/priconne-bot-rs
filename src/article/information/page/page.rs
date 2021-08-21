@@ -1,0 +1,64 @@
+use chrono::{DateTime, FixedOffset};
+use kuchiki::{ElementData, NodeDataRef, NodeRef};
+
+use super::Icon;
+use crate::{error::Error, page::Page, utils};
+
+#[derive(Debug)]
+pub struct InformationPage {
+    pub title: String,
+    pub icon: Option<Icon>,
+    pub date: Option<DateTime<FixedOffset>>,
+    pub content: kuchiki::NodeRef,
+}
+
+impl Page for InformationPage {
+    fn from_document(document: NodeRef) -> Result<Self, Error> {
+        let messages_node = document
+            .select_first(".messages")
+            .map_err(|_| Error::KuchikiError)?;
+        let date_node = document
+            .select_first(".date")
+            .map_err(|_| Error::KuchikiError)?;
+        let title_node = document
+            .select_first(".title")
+            .map_err(|_| Error::KuchikiError)?;
+
+        let messages = messages_node.as_node().children();
+        crate::utils::trim_leading_whitespace(messages);
+        let content = messages_node.as_node().clone();
+
+        Ok(InformationPage {
+            title: get_title(&title_node)?,
+            date: get_date(&date_node),
+            icon: get_icon(&date_node),
+            content,
+        })
+    }
+}
+
+fn get_title(title_node: &NodeDataRef<ElementData>) -> Result<String, Error> {
+    let title_node = title_node
+        .as_node()
+        .first_child()
+        .ok_or(Error::KuchikiError)?;
+    let title_text = title_node.into_text_ref().ok_or(Error::KuchikiError)?;
+    let title_text = title_text.borrow().trim().to_owned();
+    Ok(title_text)
+}
+
+fn get_icon(date_node: &NodeDataRef<ElementData>) -> Option<Icon> {
+    let attributes = date_node.attributes.borrow();
+    attributes
+        .get("class")?
+        .split_whitespace()
+        .find(|x| x.starts_with("icon_"))
+        .map_or(None, Icon::from_classname)
+}
+
+fn get_date(date_node: &NodeDataRef<ElementData>) -> Option<DateTime<FixedOffset>> {
+    let date_text_node = &date_node.as_node().first_child()?;
+    let date_text = date_text_node.as_text()?.borrow();
+
+    utils::string_to_date(&date_text.trim(), "%Y/%m/%d %H:%M").ok()
+}
