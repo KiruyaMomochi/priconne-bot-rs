@@ -1,11 +1,12 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cron::Schedule;
+use priconne_core::{Client, Error, Tagger};
 use reqwest::Url;
+use resource::Bot;
+use scheduler::Schedules;
 use serde::{Deserialize, Serialize};
 use teloxide::prelude::{Request, Requester};
-
-use crate::{error::Error, schedule::Schedules};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BotConfig {
@@ -171,32 +172,32 @@ impl TelegramConfig {
 }
 
 impl TaggerConfig {
-    pub fn build(&self) -> Result<crate::message::Tagger, regex::Error> {
+    pub fn build(&self) -> Result<Tagger, regex::Error> {
         let mut tag_rules = Vec::<(regex::Regex, String)>::new();
         for (tag, regexs) in &self.0 {
             for regex in regexs {
                 tag_rules.push((regex::Regex::new(regex)?, tag.to_owned()));
             }
         }
-        Ok(crate::message::Tagger { tag_rules })
+        Ok(Tagger { tag_rules })
     }
 }
 
 impl ServerConfig {
-    pub fn build(&self) -> Result<crate::client::Client, Error> {
+    pub fn build(&self) -> Result<Client, Error> {
         if self.api.len() == 0 {
             return Err(Error::NoApiServer);
         }
 
-        crate::client::Client::new(self.news.to_owned(), self.api[0].url.to_owned())
+        Client::new(self.news.to_owned(), self.api[0].url.to_owned())
     }
 
-    pub fn with_client(&self, client: reqwest::Client) -> Result<crate::client::Client, Error> {
+    pub fn with_client(&self, client: reqwest::Client) -> Result<Client, Error> {
         if self.api.len() == 0 {
             return Err(Error::NoApiServer);
         }
 
-        crate::client::Client::with_client(self.news.to_owned(), self.api[0].url.to_owned(), client)
+        Client::with_client(self.news.to_owned(), self.api[0].url.to_owned(), client)
     }
 }
 
@@ -212,11 +213,11 @@ impl MongoConfig {
 }
 
 impl BotConfig {
-    pub async fn build(&self) -> Result<crate::bot::Bot<crate::client::Client>, Error> {
+    pub async fn build(&self) -> Result<Bot<Client>, Error> {
         use teloxide::prelude::RequesterExt;
 
         let client = self.client.build()?;
-        Ok(crate::bot::Bot::<crate::client::Client> {
+        Ok(Bot::<Client> {
             client: self.server.with_client(client.clone())?,
             mongo_database: self.mongo.database().await?,
             telegraph: self.telegraph.with_client(client.clone()).await?,

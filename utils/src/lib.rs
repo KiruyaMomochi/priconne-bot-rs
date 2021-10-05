@@ -2,8 +2,10 @@ use chrono::{DateTime, FixedOffset, TimeZone};
 use kuchiki::NodeData;
 use markup5ever::local_name;
 
+/// Number of seconds in an hour
 pub const HOUR: i32 = 3600;
 
+/// Trim leading space strings from a slibling node
 pub fn trim_leading_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
     for slibling in sliblings {
         match slibling.data() {
@@ -45,6 +47,7 @@ pub fn trim_leading_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
     false
 }
 
+/// Date format from priconne api server
 pub mod api_date_format {
     use super::string_to_date;
     use chrono::{DateTime, FixedOffset};
@@ -69,6 +72,7 @@ pub mod api_date_format {
     }
 }
 
+/// Convert string to UTC+8 DateTime
 pub fn string_to_date(
     string: &str,
     format: &str,
@@ -80,10 +84,20 @@ pub fn string_to_date(
 }
 
 pub trait SplitOnce {
+    /// Split a string by a separator and return the first part and the rest
+    /// If the separator is not found, return none
     fn split_once_temp<'a>(&'a self, pattern: char) -> Option<(&'a str, &'a str)>;
 }
 
 impl SplitOnce for str {
+    /// Split a string by a separator and return the first part and the rest
+    /// If the separator is not found, return none
+    ///
+    /// # Example
+    /// ```
+    /// assert_eq!("a,b,c".split_once(","), Some(("a", "b,c")));
+    /// assert_eq!("a,b,c".split_once(":"), None);
+    /// ```
     fn split_once_temp<'a>(&'a self, pattern: char) -> Option<(&'a str, &'a str)> {
         let find_result = self.find(pattern);
         find_result.map(|position| (&self[..position], &self[position + pattern.len_utf8()..]))
@@ -91,10 +105,21 @@ impl SplitOnce for str {
 }
 
 pub trait SplitPrefix: SplitOnce {
+    /// Trim the `prefix` of a string,
+    /// then split the rest by a separator and return the first part and the rest
     fn split_prefix<'a>(&'a self, prefix: char, pattern: char) -> Option<(&'a str, &'a str)>;
 }
 
 impl SplitPrefix for str {
+    /// Trim the `prefix` of a string,
+    /// then split the rest by a separator and return the first part and the rest
+    ///
+    /// # Example
+    /// ```
+    /// assert_eq!("a,b,c".split_prefix("a", ","), Some(("b", "b,c")));
+    /// assert_eq!("a,b,c".split_prefix("a", ":"), None);
+    /// assert_eq!("a,b,c".split_prefix("b", ","), None);
+    /// ```
     fn split_prefix<'a>(&'a self, prefix: char, pattern: char) -> Option<(&'a str, &'a str)> {
         if self.starts_with(prefix) {
             self[prefix.len_utf8()..].split_once_temp(pattern)
@@ -105,12 +130,11 @@ impl SplitPrefix for str {
 }
 
 pub mod chrono_date_utc8_as_bson_datetime {
+    use crate::HOUR;
     use chrono::{FixedOffset, Utc};
     use mongodb::bson::DateTime;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::result::Result;
-
-    use crate::utils::HOUR;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::Date<FixedOffset>, D::Error>
     where
@@ -122,7 +146,7 @@ pub mod chrono_date_utc8_as_bson_datetime {
         Ok(datetime.date())
     }
 
-    /// Serializes a [`chrono::Date`] as a [`crate::DateTime`].
+    /// Serializes a [`chrono::Date`] as a [`bson::DateTime`].
     pub fn serialize<S: Serializer>(
         val: &chrono::Date<FixedOffset>,
         serializer: S,
@@ -155,14 +179,35 @@ pub mod serde_as_string {
     }
 }
 
-// impl Serialize for regex::Regex {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer {
-//         serde_as_string::serialize(self, serializer)
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kuchiki::traits::TendrilSink;
 
-// impl Deserialize for regex::Regex {
+    #[test]
+    fn test_trim_leading_whitespace() {
+        let document = kuchiki::parse_html()
+            .one("<body><div></div><h1>Test</h1></body>")
+            .select_first("body")
+            .unwrap();
+        let document = document.as_node();
+        assert_eq!(trim_leading_whitespace(document.children()), true);
+        assert_eq!(document.to_string(), "<body><h1>Test</h1></body>");
+    }
 
-// }
+    #[test]
+    fn test_split_once() {
+        let s = "abcdefg";
+        let (a, b) = s.split_once_temp('d').unwrap();
+        assert_eq!(a, "abc");
+        assert_eq!(b, "efg");
+    }
+
+    #[test]
+    fn test_split_prefix() {
+        let s = "abcdefg";
+        let (a, b) = s.split_prefix('a', 'd').unwrap();
+        assert_eq!(a, "bc");
+        assert_eq!(b, "efg");
+    }
+}

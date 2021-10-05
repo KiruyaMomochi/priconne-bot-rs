@@ -6,7 +6,6 @@ use teloxide::{
         stop_token::AsyncStopToken,
         update_listeners::{self, StatefulListener},
     },
-    prelude::*,
     types::Update,
 };
 use tokio::sync::mpsc;

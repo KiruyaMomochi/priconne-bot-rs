@@ -2,12 +2,13 @@ mod list;
 mod news;
 mod page;
 
-use kuchiki::NodeRef;
 pub use list::NewsList;
 pub use news::News;
-pub use page::NewsPage;
+pub use page::{NewsPage, NewsPageNoContent};
 
-use crate::{error::Error, utils::HOUR};
+use kuchiki::NodeRef;
+use priconne_core::Error;
+use utils::HOUR;
 
 pub fn get_date(date_node: NodeRef) -> Result<chrono::Date<chrono::FixedOffset>, Error> {
     let date_text = date_node.into_text_ref().ok_or(Error::KuchikiError)?;

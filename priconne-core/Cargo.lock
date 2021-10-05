@@ -78,34 +78,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bot"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cron",
- "env_logger",
- "futures",
- "http",
- "log",
- "mongodb",
- "priconne-core",
- "regex",
- "reqwest",
- "resource",
- "scheduler",
- "serde",
- "serde_json",
- "serde_yaml",
- "telegraph-rs",
- "teloxide",
- "tokio",
- "tokio-stream",
- "url",
- "utils",
- "warp",
-]
-
-[[package]]
 name = "bson"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,6 +194,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95059428f66df56b63431fdb4e1947ed2190586af5c5a8a8b71122bdf5a7f469"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "cron"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "628a3464535cee4e75af89e8c293bab926deaddfa166553b75029066c846be3f"
+dependencies = [
+ "chrono",
+ "nom",
 ]
 
 [[package]]
@@ -1437,27 +1419,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
-name = "priconne-core"
+name = "priconne-telegram-bot"
 version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
- "cron",
+ "cron 0.9.0",
+ "either",
  "env_logger",
  "futures",
  "http",
  "kuchiki",
+ "linked_hash_set",
  "log",
+ "markup5ever",
  "mongodb",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "telegraph-rs",
  "teloxide",
  "thiserror",
  "tokio",
+ "tokio-cron-scheduler",
+ "tokio-stream",
+ "toml",
  "url",
+ "uuid",
+ "warp",
 ]
 
 [[package]]
@@ -1675,32 +1666,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "resource"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "env_logger",
- "futures",
- "http",
- "kuchiki",
- "linked_hash_set",
- "log",
- "mongodb",
- "priconne-core",
- "reqwest",
- "serde",
- "serde_json",
- "telegraph-rs",
- "teloxide",
- "tokio",
- "toml",
- "url",
- "utils",
- "warp",
-]
-
-[[package]]
 name = "ring"
 version = "0.16.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1763,14 +1728,6 @@ checksum = "8f05ba609c234e60bee0d547fe94a4c7e9da733d1c962cf6e59efa4cd9c8bc75"
 dependencies = [
  "lazy_static",
  "winapi",
-]
-
-[[package]]
-name = "scheduler"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cron",
 ]
 
 [[package]]
@@ -2286,6 +2243,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-cron-scheduler"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b2c664a1a2c807bb7753c535341089c05b6a5421b7c1956e0226862c069f0b2"
+dependencies = [
+ "chrono",
+ "cron 0.8.0",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "tokio-macros"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2555,25 +2524,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "env_logger",
- "kuchiki",
- "log",
- "markup5ever",
- "mongodb",
- "serde",
-]
-
-[[package]]
 name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.3",
+ "serde",
 ]
 
 [[package]]

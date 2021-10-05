@@ -1,22 +1,16 @@
-use std::sync::Arc;
+mod config;
+mod telegram;
 
+use priconne_core::Error;
+use resource::cartoon::CartoonClient;
+use scheduler::Action;
+use std::sync::Arc;
+use teloxide::utils::command::BotCommand;
 use teloxide::{
     prelude::{Request, Requester, UpdateWithCx},
     types::{ChatId, InputFile},
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
-
-mod article;
-mod bot;
-mod client;
-mod config;
-mod error;
-mod message;
-mod page;
-mod schedule;
-mod telegram;
-mod glossary;
-pub mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,10 +20,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     run().await
 }
-
-use teloxide::utils::command::BotCommand;
-
-use crate::{article::cartoon::CartoonClient, schedule::Action};
 
 #[derive(Debug, BotCommand)]
 #[command(rename = "lowercase", description = "These commands are supported:")]
@@ -52,7 +42,7 @@ async fn answer(
     cx: UpdateWithCx<teloxide::Bot, teloxide::prelude::Message>,
     command: TelegramCommand,
     tx: Arc<UnboundedSender<Command>>,
-) -> Result<(), error::Error> {
+) -> Result<(), Error> {
     match command {
         TelegramCommand::Help => {
             cx.answer(TelegramCommand::descriptions()).send().await?;
@@ -62,19 +52,15 @@ async fn answer(
                 id,
                 chat_id: cx.update.chat_id().into(),
             })
-            .map_err(|_| error::Error::SendError)?,
-        TelegramCommand::CartoonAll => tx
-            .send(Command::CartoonAll)
-            .map_err(|_| error::Error::SendError)?,
-        TelegramCommand::ArticleAll => tx
-            .send(Command::ArticleAll)
-            .map_err(|_| error::Error::SendError)?,
-        TelegramCommand::NewsAll => tx
-            .send(Command::NewsAll)
-            .map_err(|_| error::Error::SendError)?,
-        TelegramCommand::Shutdown => tx
-            .send(Command::Shutdown)
-            .map_err(|_| error::Error::SendError)?,
+            .map_err(|_| Error::SendError)?,
+        TelegramCommand::CartoonAll => {
+            tx.send(Command::CartoonAll).map_err(|_| Error::SendError)?
+        }
+        TelegramCommand::ArticleAll => {
+            tx.send(Command::ArticleAll).map_err(|_| Error::SendError)?
+        }
+        TelegramCommand::NewsAll => tx.send(Command::NewsAll).map_err(|_| Error::SendError)?,
+        TelegramCommand::Shutdown => tx.send(Command::Shutdown).map_err(|_| Error::SendError)?,
     };
 
     Ok(())
@@ -129,7 +115,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Command::Log => log::info!("log"),
             }
         }
-        Ok::<(), error::Error>(())
+        Ok::<(), Error>(())
     };
 
     let schedule = async move {

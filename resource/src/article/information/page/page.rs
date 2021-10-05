@@ -2,7 +2,7 @@ use chrono::{DateTime, FixedOffset};
 use kuchiki::{ElementData, NodeDataRef, NodeRef};
 
 use super::Icon;
-use crate::{error::Error, page::Page, utils};
+use priconne_core::{Error, Page};
 
 #[derive(Debug)]
 pub struct InformationPage {
@@ -16,7 +16,7 @@ pub struct InformationPage {
 pub struct InformationPageNoContent {
     pub title: String,
     pub icon: Option<Icon>,
-    pub date: Option<DateTime<FixedOffset>>
+    pub date: Option<DateTime<FixedOffset>>,
 }
 
 impl Page for InformationPage {
@@ -32,7 +32,7 @@ impl Page for InformationPage {
             .map_err(|_| Error::KuchikiError)?;
 
         let messages = messages_node.as_node().children();
-        crate::utils::trim_leading_whitespace(messages);
+        utils::trim_leading_whitespace(messages);
         let content = messages_node.as_node().clone();
 
         if title_node.text_contents().is_empty() {
@@ -50,11 +50,14 @@ impl Page for InformationPage {
 
 impl InformationPage {
     pub fn split(self) -> (InformationPageNoContent, kuchiki::NodeRef) {
-        (InformationPageNoContent {
-            date: self.date,
-            icon: self.icon,
-            title: self.title
-        }, self.content)
+        (
+            InformationPageNoContent {
+                date: self.date,
+                icon: self.icon,
+                title: self.title,
+            },
+            self.content,
+        )
     }
 }
 

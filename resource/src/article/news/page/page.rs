@@ -1,7 +1,8 @@
 use super::{get_category, get_date};
-use crate::{error::Error, page::Page, utils::trim_leading_whitespace};
 use chrono::{Date, FixedOffset};
 use kuchiki::{ElementData, NodeDataRef, NodeRef};
+use priconne_core::{Error, Page};
+use utils::trim_leading_whitespace;
 
 #[derive(Debug)]
 pub struct NewsPage {
@@ -71,7 +72,7 @@ impl NewsPage {
                 date: self.date,
                 title: self.title,
             },
-            self.content
+            self.content,
         )
     }
 }
@@ -93,4 +94,23 @@ fn get_content(section_node: &NodeDataRef<ElementData>) -> Result<&NodeRef, Erro
     }
 
     Ok(section_node)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+    use kuchiki::traits::TendrilSink;
+    use utils::HOUR;
+    use std::path::Path;
+
+    #[test]
+    fn test_from_document() {
+        let path = Path::new("tests/news_page.html");
+        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let page = NewsPage::from_document(document).unwrap();
+        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 08, 24));
+        assert_eq!(page.category, Some("活動".to_owned()));
+        assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
+    }
 }

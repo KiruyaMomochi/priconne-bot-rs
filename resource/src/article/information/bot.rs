@@ -1,0 +1,186 @@
+use super::*;
+use crate::{message::MessageBuilder, Bot};
+use futures::StreamExt;
+use linked_hash_set::LinkedHashSet;
+use log::info;
+use priconne_core::{Error, Tagger};
+use std::pin::Pin;
+use telegraph_rs::doms_to_nodes;
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::Requester,
+    types::{ChatId, Message, ParseMode},
+};
+use utils::SplitPrefix;
+
+use super::{Announce, InformationClient, InformationExt};
+
+#[derive(Debug)]
+pub struct InformationMessageBuilder<'a> {
+    pub page: &'a InformationPageNoContent,
+    pub announce_id: i32,
+    pub telegraph_page: &'a telegraph_rs::Page,
+    pub tagger: &'a Tagger,
+}
+
+impl<'a> MessageBuilder for InformationMessageBuilder<'a> {
+    fn build_message(&self) -> String {
+        let (title, tags) = tags(&self.page, &self.tagger);
+        let link = &self.telegraph_page.url;
+        let id = self.announce_id;
+        let time = self.page.date.map_or("Unknown".to_string(), |date| {
+            date.format(utils::api_date_format::FORMAT).to_string()
+        });
+
+        let mut tag_str = String::new();
+
+        for tag in &tags {
+            tag_str.push_str("#");
+            tag_str.push_str(tag);
+            tag_str.push_str(" ");
+        }
+
+        if !tag_str.is_empty() {
+            tag_str.pop();
+            tag_str.push('\n');
+        }
+
+        let message = format!(
+            "{tag}<b>{title}</b>\n{link}\n{time} <code>#{id}</code>",
+            tag = tag_str,
+            title = title,
+            link = link,
+            time = time,
+            id = id
+        );
+
+        message
+    }
+}
+
+pub struct SentInformation {
+    message: Message,
+    telegraph: telegraph_rs::Page,
+    page: InformationPageNoContent,
+}
+
+impl<C: InformationClient + Clone + Send> Bot<C> {
+    pub async fn announce_by_id(
+        &self,
+        announce_id: i32,
+        chat_id: ChatId,
+    ) -> Result<SentInformation, Error> {
+        info!("Announcing by id {}", announce_id);
+
+        let page;
+        let content;
+        {
+            let (p, c) = self.client.information_page(announce_id).await?.split();
+            page = p;
+            content = serde_json::to_string(&doms_to_nodes(c.children()))?;
+        };
+        info!("Got information page {}", page.title);
+
+        let telegraph_page = self
+            .telegraph
+            .create_page(&page.title, &content, false)
+            .await?;
+        info!("Published telegraph page {}", telegraph_page.url);
+
+        let message_builder = InformationMessageBuilder {
+            announce_id,
+            telegraph_page: &telegraph_page,
+            page: &page,
+            tagger: &self.tagger,
+        };
+
+        let message = self
+            .bot
+            .send_message(chat_id, message_builder.build_message())
+            .parse_mode(ParseMode::Html)
+            .disable_notification(false)
+            .await?;
+
+        Ok(SentInformation {
+            message,
+            page,
+            telegraph: telegraph_page,
+        })
+    }
+
+    pub async fn announce(
+        &self,
+        announce: &Announce,
+        chat_id: ChatId,
+    ) -> Result<SentInformation, Error> {
+        return self.announce_by_id(announce.announce_id, chat_id).await;
+    }
+
+    pub async fn announce_all(&self, limit: i32, min: i32, chat_id: ChatId) -> Result<(), Error> {
+        log::info!("announce_all with limit {} and min {}", limit, min);
+
+        let stream = self.client.information_stream();
+        let mut stream = unsafe { Pin::new_unchecked(stream) };
+
+        let mut skip_counter = 0;
+        let mut vec = Vec::new();
+        while let Some(announce) = stream.next().await {
+            if skip_counter >= limit {
+                break;
+            }
+
+            let sent_information = self.mongo_database.check_sent_announce(&announce).await?;
+            if sent_information.is_not_found() {
+                log::info!(
+                    "hit information {}: {}",
+                    announce.announce_id,
+                    announce.title.title
+                );
+                if announce.announce_id >= min {
+                    skip_counter = 0;
+                }
+
+                vec.push((announce, sent_information));
+            } else {
+                skip_counter += 1;
+                log::info!(
+                    "ign information {}: {} ({}/{})",
+                    announce.announce_id,
+                    announce.title.title,
+                    skip_counter,
+                    limit
+                );
+            }
+        }
+
+        for (announce, result) in vec.iter().rev() {
+            let message = self.announce(announce, chat_id.clone()).await?;
+            self.mongo_database
+                .upsert_sent_information(
+                    &result,
+                    announce,
+                    &message.message,
+                    &message.telegraph.url,
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+}
+
+fn tags<'a>(page: &'a InformationPageNoContent, tagger: &'a Tagger) -> (&'a str, Vec<String>) {
+    let mut title: &str = &page.title;
+    let mut tags: LinkedHashSet<String> = LinkedHashSet::new();
+
+    if let Some(icon) = page.icon {
+        tags.insert(icon.to_tag().to_string());
+    }
+    if let Some((category, base_title)) = title.split_prefix('【', '】') {
+        title = base_title;
+        tags.insert(category.to_string());
+    }
+
+    tags.extend(tagger.tag(title));
+    (title, tags.into_iter().collect())
+}

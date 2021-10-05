@@ -1,0 +1,28 @@
+[package]
+authors = ["KiruyaMomochi <KiruyaMomochi@users.noreply.github.com>"]
+edition = "2018"
+name = "priconne-core"
+version = "0.2.0"
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "^0.4.19", default-features = false, features = [
+    "clock",
+    "serde",
+] }
+cron = "0.9.0"
+env_logger = "0.9.0"
+futures = "^0.3.15"
+http = "0.2.4"
+kuchiki = "^0.8.1"
+log = "0.4.14"
+mongodb = { version = "2.0.0-beta.3", features = ["bson-chrono-0_4"] }
+regex = "1"
+reqwest = "^0.11.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "^1.0.64"
+telegraph-rs = { git = "https://github.com/KiruyaMomochi/telegraph-rs" }
+teloxide = { version = "0.5", features = ["auto-send", "macros"] }
+thiserror = "1.0"
+tokio = { version = "^1.8.1", features = ["rt-multi-thread", "macros", "sync"] }
+url = "^2.2.2"

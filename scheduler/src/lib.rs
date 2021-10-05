@@ -1,4 +1,5 @@
 use chrono::{DateTime, TimeZone, Utc};
+use cron::Schedule;
 
 /// A function that runs at time specified by schedules
 pub struct Action<'a> {
@@ -40,13 +41,13 @@ impl<'a> Action<'a> {
 }
 
 pub struct Schedules {
-    /// List of [`cron::Schedule`]s
-    schedules: Vec<cron::Schedule>,
+    /// List of [`Schedule`]
+    schedules: Vec<Schedule>,
 }
 
 impl Schedules {
     /// Create a new schedules with the given list of schedules
-    pub fn new(schedules: Vec<cron::Schedule>) -> Self {
+    pub fn new(schedules: Vec<Schedule>) -> Self {
         Self { schedules }
     }
 
@@ -73,7 +74,7 @@ where
     Z: TimeZone,
 {
     is_done: bool,
-    schedule: &'a Vec<cron::Schedule>,
+    schedule: &'a Vec<Schedule>,
     previous_datetime: DateTime<Z>,
 }
 
@@ -81,7 +82,7 @@ impl<'a, Z> SchedulesIterator<'a, Z>
 where
     Z: TimeZone,
 {
-    fn new(schedule: &'a Vec<cron::Schedule>, starting_datetime: &DateTime<Z>) -> Self {
+    fn new(schedule: &'a Vec<Schedule>, starting_datetime: &DateTime<Z>) -> Self {
         Self {
             is_done: false,
             previous_datetime: starting_datetime.clone(),
@@ -154,11 +155,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::str::FromStr;
-
-    use cron::Schedule;
-
-    use crate::{schedule::Schedules, utils::HOUR};
 
     #[test]
     fn test_schedules() {
@@ -169,8 +167,7 @@ mod tests {
             ],
         };
 
-        let time =
-            chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z").unwrap();
+        let time = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z").unwrap();
         let mut iterator = schedules.after(&time);
         assert_eq!(
             iterator.next().unwrap(),
