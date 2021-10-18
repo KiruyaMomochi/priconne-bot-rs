@@ -1,6 +1,7 @@
 mod config;
 mod telegram;
 
+use futures::TryFutureExt;
 use priconne_core::Error;
 use resource::cartoon::CartoonClient;
 use scheduler::Action;
@@ -98,21 +99,31 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let cartoon_chat = config.telegram.cartoon_chat.clone();
     let information_chat = config.telegram.information_chat.clone();
+    let debug_chat = config.telegram.debug_chat.clone();
     let recv = async move {
         while let Some(received) = rx.recv().await {
-            match received {
-                Command::Cartoon { id, chat_id } => {
-                    let cartoon = client.cartoon_detail(id).await?;
-                    tg.send_photo(chat_id, InputFile::Url(cartoon.image_src))
+            let result = match &received {
+                Command::Cartoon { id, chat_id } => match client.cartoon_detail(*id).await {
+                    Ok(cartoon) => tg
+                        .send_photo(chat_id.clone(), InputFile::Url(cartoon.image_src))
                         .send()
                         .await
-                        .unwrap();
-                }
-                Command::CartoonAll => bot.cartoon_all(5, 269, cartoon_chat.clone()).await?,
-                Command::ArticleAll => bot.announce_all(5, 1434, information_chat.clone()).await?,
-                Command::NewsAll => bot.news_all(5, 1332, information_chat.clone()).await?,
-                Command::Shutdown => break,
-                Command::Log => log::info!("log"),
+                        .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
+                    Err(error) => Err(error),
+                },
+                Command::CartoonAll => bot.cartoon_all(5, 269, cartoon_chat.clone()).await,
+                Command::ArticleAll => bot.announce_all(5, 1434, information_chat.clone()).await,
+                Command::NewsAll => bot.news_all(5, 1332, information_chat.clone()).await,
+                Command::Shutdown => Ok(rx.close()),
+                Command::Log => Ok(log::info!("log")),
+            };
+            if let Err(error) = result {
+                tg.send_message(
+                    debug_chat.clone(),
+                    format!("Error {} occurs in command {:?}", error, received),
+                )
+                .send()
+                .await?;
             }
         }
         Ok::<(), Error>(())
