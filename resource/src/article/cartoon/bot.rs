@@ -95,7 +95,7 @@ impl<C: CartoonClient + Clone + Send> Bot<C> {
                     cartoon.episode,
                     cartoon.title,
                     skip_counter,
-                    min
+                    limit
                 );
             }
         }
