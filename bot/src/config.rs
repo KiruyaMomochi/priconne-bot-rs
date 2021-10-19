@@ -8,7 +8,7 @@ use scheduler::Schedules;
 use serde::{Deserialize, Serialize};
 use teloxide::prelude::{Request, Requester};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotConfig {
     pub tags: TaggerConfig,
     pub client: ClientConfig,
@@ -16,49 +16,47 @@ pub struct BotConfig {
     pub server: ServerConfig,
     pub telegram: TelegramConfig,
     pub telegraph: TelegraphConfig,
-    pub schedule: ScheduleConfig,
+    pub resources: ResourceConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct TaggerConfig(HashMap<String, Vec<String>>);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientConfig {
     user_agent: String,
     proxy: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MongoConfig {
     connection_string: String,
     database: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     news: String,
     api: Vec<ApiServerConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiServerConfig {
     id: String,
     url: String,
     name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramConfig {
     pub webhook_url: Option<String>,
     pub listen_addr: Option<String>,
     pub token: String,
-    pub information_chat: teloxide::types::ChatId,
-    pub cartoon_chat: teloxide::types::ChatId,
     pub debug_chat: teloxide::types::ChatId,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegraphConfig {
     short_name: String,
     access_token: String,
@@ -68,7 +66,7 @@ pub struct TelegraphConfig {
 
 macro_rules! schedule_config {
     ($($var:ident),*) => {
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         pub struct ScheduleConfig {
             $(
                 $var: Vec<String>,
@@ -90,7 +88,28 @@ macro_rules! schedule_config {
     }
 }
 
-schedule_config! {article, cartoon, news}
+macro_rules! article_resource_config {
+    ($name:ident) => {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        pub struct $name {
+            pub schedules: Schedules,
+            pub chat: teloxide::types::ChatId,
+            pub min: i32,
+            pub limit: i32,
+        }
+    };
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceConfig {
+    pub information: InformationResourceConfig,
+    pub cartoon: CartoonResourceConfig,
+    pub news: NewsResourceConfig,
+}
+
+article_resource_config!(InformationResourceConfig);
+article_resource_config!(CartoonResourceConfig);
+article_resource_config!(NewsResourceConfig);
 
 macro_rules! set_some {
     ($var:ident, $self:expr => $($field:ident),*) => {
@@ -224,5 +243,26 @@ impl BotConfig {
             bot: self.telegram.with_client(client.clone()).await?.auto_send(),
             tagger: self.tags.build()?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use super::*;
+
+    #[test]
+    fn test_deserialize_bot_config() {
+        let config = File::open("tests/config.yaml").unwrap();
+        let bot_config: BotConfig = serde_yaml::from_reader(config).unwrap();
+
+        assert_eq!(bot_config.server.api.len(), 5);
+        assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
+        assert_eq!(bot_config.telegram.webhook_url, Some("https://example.com/webhook".to_string()));
+        assert_eq!(bot_config.telegram.token, "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".to_string());
+        assert_eq!(bot_config.telegram.listen_addr, Some("127.0.0.1:5555".to_string()));
+        assert_eq!(bot_config.mongo.connection_string, "mongodb://localhost:27017".to_string());
+        assert_eq!(bot_config.mongo.database, "test".to_string());
+        assert_eq!(bot_config.tags.0.len(), 2);
     }
 }

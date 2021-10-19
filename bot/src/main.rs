@@ -81,6 +81,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     let config: config::BotConfig = serde_yaml::from_reader(std::fs::File::open("config.yaml")?)?;
+    let cartoon = config.resources.cartoon.clone();
+    let information = config.resources.information.clone();
+    let news = config.resources.news.clone();
 
     let listener = config.telegram.listener().await;
     let tg = config.telegram.build().await?;
@@ -97,8 +100,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         listener,
     );
 
-    let cartoon_chat = config.telegram.cartoon_chat.clone();
-    let information_chat = config.telegram.information_chat.clone();
     let debug_chat = config.telegram.debug_chat.clone();
     let recv = async move {
         while let Some(received) = rx.recv().await {
@@ -111,9 +112,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
                     Err(error) => Err(error),
                 },
-                Command::CartoonAll => bot.cartoon_all(5, 269, cartoon_chat.clone()).await,
-                Command::ArticleAll => bot.announce_all(5, 1434, information_chat.clone()).await,
-                Command::NewsAll => bot.news_all(5, 1332, information_chat.clone()).await,
+                Command::CartoonAll => {
+                    bot.cartoon_all(cartoon.limit, cartoon.min, cartoon.chat.clone())
+                        .await
+                }
+                Command::ArticleAll => {
+                    bot.announce_all(information.limit, information.min, information.chat.clone())
+                        .await
+                }
+                Command::NewsAll => bot.news_all(news.limit, news.min, news.chat.clone()).await,
                 Command::Shutdown => Ok(rx.close()),
                 Command::Log => Ok(log::info!("log")),
             };
@@ -130,13 +137,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let schedule = async move {
-        let mut article_action = Action::new(config.schedule.article()?, || {
-            tx.clone().send(Command::ArticleAll).unwrap()
-        });
-        let mut cartoon_action = Action::new(config.schedule.cartoon()?, || {
+        let mut article_action =
+            Action::new(config.resources.information.schedules.clone(), || {
+                tx.clone().send(Command::ArticleAll).unwrap()
+            });
+        let mut cartoon_action = Action::new(config.resources.cartoon.schedules.clone(), || {
             tx.clone().send(Command::CartoonAll).unwrap()
         });
-        let mut news_action = Action::new(config.schedule.news()?, || {
+        let mut news_action = Action::new(config.resources.news.schedules.clone(), || {
             tx.clone().send(Command::NewsAll).unwrap()
         });
 

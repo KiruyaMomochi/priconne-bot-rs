@@ -1,0 +1,69 @@
+tags:
+  精選轉蛋: ["精選轉蛋"]
+  必中白金: ["★3必中白金轉蛋"]
+
+client:
+  user_agent: "pcrinfobot-rs/0.2.0 Android"
+  proxy: "127.0.0.1:8565"
+
+mongo:
+  connection_string: "mongodb://localhost:27017"
+  database: "test"
+
+server:
+  news: "http://example.com/"
+  api:
+    - id: "API1"
+      url: "https://api.example.com/"
+      name: "api-1"
+    - id: "API2"
+      url: "https://api2.example.com/"
+      name: "api-2"
+    - id: "API3"
+      url: "https://api3.example.com/"
+      name: "api-3"
+    - id: "API4"
+      url: "https://api4.example.com/"
+      name: "api-4"
+    - id: "STAGING"
+      url: "https://stagomh.example.com/"
+      name: "staging"
+
+telegram:
+  webhook_url: "https://example.com/webhook"
+  listen_addr: "127.0.0.1:5555"
+  token: "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  debug_chat: "@pcrtwstat"
+
+telegraph:
+  short_name: "公連資訊"
+  author_name: "priconne-bot-rs"
+  author_url: "http://example.com"
+  access_token: "123456"
+
+resources:
+  information:
+    schedules:
+      - "0 1-59/30 7-21 * * *"
+      - "0 57 12 * * *"
+      - "0 1 0-6,22-23 * * *"
+    chat: "@pcrtw"
+    min: 1434
+    limit: 5
+
+  cartoon:
+    schedules:
+      - "0 2,4,8,16 16 * * *"
+      - "0 1 7-18 * * *"
+    chat: "@pcrtwcart"
+    min: 269
+    limit: 5
+
+  news:
+    schedules:
+      - "0 10-59/30 7-21 * * *"
+      - "0 59 12 * * *"
+      - "0 10 0-6,22-23 * * *"
+    chat: "@pcrtw"
+    min: 1332
+    limit: 5
