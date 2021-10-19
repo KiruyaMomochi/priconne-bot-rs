@@ -94,11 +94,13 @@ impl<C: InformationClient + Clone + Send> Bot<C> {
             tagger: &self.tagger,
         };
 
+        let disable_notification = page.title.contains("外掛停權");
+
         let message = self
             .bot
             .send_message(chat_id, message_builder.build_message())
             .parse_mode(ParseMode::Html)
-            .disable_notification(false)
+            .disable_notification(disable_notification)
             .await?;
 
         Ok(SentInformation {
