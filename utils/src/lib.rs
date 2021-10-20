@@ -95,8 +95,9 @@ impl SplitOnce for str {
     ///
     /// # Example
     /// ```
-    /// assert_eq!("a,b,c".split_once(","), Some(("a", "b,c")));
-    /// assert_eq!("a,b,c".split_once(":"), None);
+    /// use crate::utils::SplitOnce;
+    /// assert_eq!("a,b,c".split_once(','), Some(("a", "b,c")));
+    /// assert_eq!("a,b,c".split_once(':'), None);
     /// ```
     fn split_once_temp<'a>(&'a self, pattern: char) -> Option<(&'a str, &'a str)> {
         let find_result = self.find(pattern);
@@ -116,9 +117,10 @@ impl SplitPrefix for str {
     ///
     /// # Example
     /// ```
-    /// assert_eq!("a,b,c".split_prefix("a", ","), Some(("b", "b,c")));
-    /// assert_eq!("a,b,c".split_prefix("a", ":"), None);
-    /// assert_eq!("a,b,c".split_prefix("b", ","), None);
+    /// use crate::utils::SplitPrefix;
+    /// assert_eq!("a,b,c".split_prefix('a', ','), Some(("", "b,c")));
+    /// assert_eq!("a,b,c".split_prefix('a', ':'), None);
+    /// assert_eq!("a,b,c".split_prefix('b', ','), None);
     /// ```
     fn split_prefix<'a>(&'a self, prefix: char, pattern: char) -> Option<(&'a str, &'a str)> {
         if self.starts_with(prefix) {
