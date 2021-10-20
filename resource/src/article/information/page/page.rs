@@ -86,3 +86,25 @@ fn get_date(date_node: &NodeDataRef<ElementData>) -> Option<DateTime<FixedOffset
 
     utils::string_to_date(&date_text.trim(), "%Y/%m/%d %H:%M").ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+    use kuchiki::traits::TendrilSink;
+    use utils::HOUR;
+    use std::path::Path;
+
+    #[test]
+    fn test_information_page_from_document() {
+        let path = Path::new("tests/information_page.html");
+        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let page = InformationPage::from_document(document).unwrap();
+        assert_eq!(page.title, "【活動】臺灣藝術家聯合會藝術研習班");
+        assert_eq!(
+            page.date,
+            Some(FixedOffset::east(8 * HOUR).ymd(2021, 10, 19).and_hms(11, 55, 0))
+        );
+        assert_eq!(page.icon, Some(Icon::Activity));
+    }
+}

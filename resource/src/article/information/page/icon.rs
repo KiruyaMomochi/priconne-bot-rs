@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Icon {
     Activity = 1,
     Gotcha = 2,
