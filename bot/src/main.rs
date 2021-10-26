@@ -1,9 +1,9 @@
 mod config;
 mod telegram;
 
-use futures::TryFutureExt;
 use priconne_core::Error;
 use resource::cartoon::CartoonClient;
+use resource::news::NewsClient;
 use scheduler::Action;
 use std::sync::Arc;
 use teloxide::utils::command::BotCommand;
@@ -29,6 +29,8 @@ enum TelegramCommand {
     Help,
     #[command(description = "get cartoon by id.", parse_with = "split")]
     Cartoon { id: i32 },
+    #[command(description = "get news by id.", parse_with = "split")]
+    News { id: i32 },
     #[command(description = "send all cartoons.")]
     CartoonAll,
     #[command(description = "send all articles.")]
@@ -54,6 +56,12 @@ async fn answer(
                 chat_id: cx.update.chat_id().into(),
             })
             .map_err(|_| Error::SendError)?,
+        TelegramCommand::News { id } => tx
+            .send(Command::News {
+                id,
+                chat_id: cx.update.chat_id().into(),
+            })
+            .map_err(|_| Error::SendError)?,
         TelegramCommand::CartoonAll => {
             tx.send(Command::CartoonAll).map_err(|_| Error::SendError)?
         }
@@ -70,6 +78,7 @@ async fn answer(
 #[derive(Debug)]
 enum Command {
     Cartoon { id: i32, chat_id: ChatId },
+    News { id: i32, chat_id: ChatId },
     CartoonAll,
     ArticleAll,
     NewsAll,
@@ -87,7 +96,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = config.telegram.listener().await;
     let tg = config.telegram.build().await?;
-    let _telegraph = config.telegraph.build().await?;
+    let telegraph = config.telegraph.build().await?;
     let client = config.server.build().unwrap();
     let bot = config.build().await?;
 
@@ -112,6 +121,30 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
                     Err(error) => Err(error),
                 },
+                Command::News { id, chat_id } => {
+                    let result;
+                    {
+                        result = client.news_page(*id).await.map(|page| {
+                            let (p, c) = page.split();
+                            (
+                                p,
+                                serde_json::to_string(&telegraph_rs::doms_to_nodes(c.children())),
+                            )
+                        });
+                    };
+                    match result {
+                        Ok((news, Ok(content))) => {
+                            let p = telegraph
+                                .create_page(&news.title, &content, false)
+                                .await
+                                .map_or("Failed to get url".to_owned(), |p| p.url);
+                            let r = tg.send_message(chat_id.clone(), p).send().await;
+                            r.map_or_else(|error| Err(Error::from(error)), |_| Ok(()))
+                        }
+                        Ok((_, Err(error))) => Err(error.into()),
+                        Err(error) => Err(error),
+                    }
+                }
                 Command::CartoonAll => {
                     bot.cartoon_all(cartoon.limit, cartoon.min, cartoon.chat.clone())
                         .await
