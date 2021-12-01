@@ -202,10 +202,9 @@ impl TelegramConfig {
         if let Some(url) = &self.webhook_url {
             let url = Url::parse(&url)?;
             tg.set_webhook(url).send().await?;
-
             let listener = self.listener().await;
             
-            teloxide::commands_repl_with_listener::<teloxide::Bot, Cmd, H, Fut, _, _, HandlerE, _>(
+            teloxide::commands_repl_with_listener(
                 tg,
                 self.name.clone(),
                 handler,
@@ -213,7 +212,7 @@ impl TelegramConfig {
             )
             .await;
         } else {
-            teloxide::commands_repl::<teloxide::Bot, Cmd, H, Fut, _, _>(
+            teloxide::commands_repl(
                 tg,
                 self.name.clone(),
                 handler,
