@@ -1,39 +1,44 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc, Local};
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 /// A function that runs at time specified by schedules
-pub struct Action<'a> {
+pub struct Action<'a, Z: TimeZone> {
     /// Schedule of the action
     schedules: Schedules,
     /// Last time the action was run
-    last_tick: Option<DateTime<Utc>>,
+    last_tick: Option<DateTime<Z>>,
+    /// Time zone of the action
+    time_zone: Z,
     /// Action to run
     run: Box<dyn (FnMut() -> ()) + Send + Sync + 'a>,
 }
 
-impl<'a> Action<'a> {
-    /// Create a new action with the given schedules and run function
-    pub fn new<T>(schedules: Schedules, run: T) -> Self
+impl<'a, Z> Action<'a, Z> where Z: TimeZone {
+    /// Create a new action with the given schedules and run function 
+    /// in specified time zone
+    pub fn new<T>(schedules: Schedules, run: T, time_zone: Z) -> Self
     where
-        T: (FnMut() -> ()) + Send + Sync + 'a,
+        T: (FnMut() -> ()) + Send + Sync + 'a
     {
         Self {
             schedules,
             last_tick: None,
             run: Box::new(run),
+            time_zone,
         }
     }
 
     /// Check if the action should run now, and run it if needed
-    pub fn tick(&mut self) {
-        let now = Utc::now();
+    pub fn tick(&mut self)
+    {
+        let now = Utc::now().with_timezone(&self.time_zone);
         if self.last_tick.is_none() {
             self.last_tick = Some(now);
             return;
         }
-        let last_tick = self.last_tick.unwrap();
+        let last_tick = self.last_tick.as_ref().unwrap();
         let event = self.schedules.after(&last_tick).next().unwrap();
         if event <= now {
             (self.run)();
@@ -42,8 +47,30 @@ impl<'a> Action<'a> {
     }
 }
 
+impl<'a> Action<'a, Utc> {
+    /// Create a new action with the given schedules and run function
+    /// in UTC time zone
+    pub fn new_utc<T>(schedules: Schedules, run: T) -> Self
+    where
+        T: (FnMut() -> ()) + Send + Sync + 'a
+    {
+        Self::new(schedules, run, Utc)
+    }
+}
+
+impl<'a> Action<'a, Local> {
+    /// Create a new action with the given schedules and run function
+    /// in local time zone
+    pub fn new_local<T>(schedules: Schedules, run: T) -> Self
+    where
+        T: (FnMut() -> ()) + Send + Sync + 'a
+    {
+        Self::new(schedules, run, Local)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(transparent)] 
+#[serde(transparent)]
 pub struct Schedules {
     /// List of [`Schedule`]
     #[serde(with = "schedules")]

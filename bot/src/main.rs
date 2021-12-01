@@ -148,13 +148,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let schedule = async move {
         let mut article_action =
-            Action::new(config.resources.information.schedules.clone(), || {
+            Action::new_local(config.resources.information.schedules.clone(), || {
                 tx.clone().send(Command::ArticleAll).unwrap()
             });
-        let mut cartoon_action = Action::new(config.resources.cartoon.schedules.clone(), || {
+        let mut cartoon_action = Action::new_local(config.resources.cartoon.schedules.clone(), || {
             tx.clone().send(Command::CartoonAll).unwrap()
         });
-        let mut news_action = Action::new(config.resources.news.schedules.clone(), || {
+        let mut news_action = Action::new_local(config.resources.news.schedules.clone(), || {
             tx.clone().send(Command::NewsAll).unwrap()
         });
 
