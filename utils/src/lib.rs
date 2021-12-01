@@ -1,6 +1,12 @@
+use std::{fmt, str::FromStr};
+
 use chrono::{DateTime, FixedOffset, TimeZone};
 use kuchiki::NodeData;
 use markup5ever::local_name;
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer,
+};
 
 /// Number of seconds in an hour
 pub const HOUR: i32 = 3600;
@@ -179,6 +185,37 @@ pub mod serde_as_string {
         let string = val.to_string();
         string.serialize(serializer)
     }
+}
+
+pub fn string_or_i32<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOri32;
+
+    impl<'de> Visitor<'de> for StringOri32 {
+        type Value = i32;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or i32")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            FromStr::from_str(value).map_err(de::Error::custom)
+        }
+
+        fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(v)
+        }
+    }
+
+    deserializer.deserialize_any(StringOri32)
 }
 
 pub fn replace_relative_path(

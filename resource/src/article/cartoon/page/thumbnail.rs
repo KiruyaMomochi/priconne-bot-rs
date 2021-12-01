@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Thumbnail {
-    #[serde(with = "utils::serde_as_string")]
+    #[serde(deserialize_with = "utils::string_or_i32")]
     pub id: i32,
     pub episode: String,
     pub current_page_id: i32,
@@ -28,6 +28,14 @@ mod test {
   "title": "很擅長料理的人",
   "thumbnail": "https://img-pc.so-net.tw/elements/media/cartoon/image/fbd6340391b4421719a47ab1ae38e6cf.png"
 }"#;
+        let cjson = r#"{
+  "id": 258,
+  "episode": "257",
+  "current_page_id": 0,
+  "page_set": 0,
+  "title": "很擅長料理的人",
+  "thumbnail": "https://img-pc.so-net.tw/elements/media/cartoon/image/fbd6340391b4421719a47ab1ae38e6cf.png"
+}"#;
         let thumbnail = Thumbnail{
             thumbnail: "https://img-pc.so-net.tw/elements/media/cartoon/image/fbd6340391b4421719a47ab1ae38e6cf.png".to_owned(),
             current_page_id: 0,
@@ -41,7 +49,7 @@ mod test {
         assert_eq!(result, thumbnail);
 
         let result = serde_json::to_string_pretty(&thumbnail)?;
-        assert_eq!(result, json);
+        assert_eq!(result, cjson);
 
         Ok(())
     }

@@ -55,7 +55,7 @@ async fn upsert_cartoon(
 
 fn cartoon_filter(thumbnail: &Thumbnail) -> Document {
     doc! {
-        "id": &thumbnail.id
+        "id": thumbnail.id
     }
 }
 
