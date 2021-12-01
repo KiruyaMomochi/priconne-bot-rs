@@ -75,19 +75,19 @@ impl<C: CartoonClient + Clone + Send> Bot<C> {
         let mut skip_counter = 0;
         let mut vec = Vec::new();
         while let Some(cartoon) = stream.next().await {
-            if skip_counter >= limit {
+            if skip_counter >= limit || cartoon.id < min {
                 break;
             }
 
             let sent_cartoon = self.mongo_database.check_cartoon(&cartoon).await?;
-
-            if let Some(sent_cartoon) = sent_cartoon {
+            
+            if sent_cartoon.is_none() {
                 log::info!("hit cartoon {}: {}", cartoon.episode, cartoon.title);
                 if cartoon.id >= min {
                     skip_counter = 0;
                 }
 
-                vec.push(sent_cartoon);
+                vec.push(cartoon);
             } else {
                 skip_counter += 1;
                 log::info!(

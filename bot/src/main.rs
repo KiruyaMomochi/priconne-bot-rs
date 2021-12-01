@@ -3,7 +3,6 @@ mod telegram;
 
 use priconne_core::Error;
 use resource::cartoon::CartoonClient;
-use resource::news::NewsClient;
 use scheduler::Action;
 use std::sync::Arc;
 use teloxide::utils::command::BotCommand;
@@ -87,64 +86,39 @@ enum Command {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let (tx, mut rx) = mpsc::unbounded_channel();
-
     let config: config::BotConfig = serde_yaml::from_reader(std::fs::File::open("config.yaml")?)?;
     let cartoon = config.resources.cartoon.clone();
     let information = config.resources.information.clone();
     let news = config.resources.news.clone();
 
-    let listener = config.telegram.listener().await;
-    let tg = config.telegram.build().await?;
-    let telegraph = config.telegraph.build().await?;
     let client = config.server.build().unwrap();
+
     let bot = config.build().await?;
-
+    let (tx, mut rx) = mpsc::unbounded_channel();
     let atx = Arc::new(tx.clone());
+    let telegram = config.telegram.clone();
+    let repl = telegram.repl(move |cx, command| answer(cx, command, atx.clone()));
 
-    let repl = teloxide::commands_repl_with_listener(
-        tg.clone(),
-        "priconne-telegram-bot 🦀",
-        move |cx, command| answer(cx, command, atx.clone()),
-        listener,
-    );
+    let telegram = config.telegram.clone();
+    let debug_chat = telegram.debug_chat.clone();
 
-    let debug_chat = config.telegram.debug_chat.clone();
     let recv = async move {
         while let Some(received) = rx.recv().await {
             let result = match &received {
                 Command::Cartoon { id, chat_id } => match client.cartoon_detail(*id).await {
-                    Ok(cartoon) => tg
+                    Ok(cartoon) => telegram
+                        .build()
+                        .await?
                         .send_photo(chat_id.clone(), InputFile::Url(cartoon.image_src))
                         .send()
                         .await
                         .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
                     Err(error) => Err(error),
                 },
-                Command::News { id, chat_id } => {
-                    let result;
-                    {
-                        result = client.news_page(*id).await.map(|page| {
-                            let (p, c) = page.split();
-                            (
-                                p,
-                                serde_json::to_string(&telegraph_rs::doms_to_nodes(c.children())),
-                            )
-                        });
-                    };
-                    match result {
-                        Ok((news, Ok(content))) => {
-                            let p = telegraph
-                                .create_page(&news.title, &content, false)
-                                .await
-                                .map_or("Failed to get url".to_owned(), |p| p.url);
-                            let r = tg.send_message(chat_id.clone(), p).send().await;
-                            r.map_or_else(|error| Err(Error::from(error)), |_| Ok(()))
-                        }
-                        Ok((_, Err(error))) => Err(error.into()),
-                        Err(error) => Err(error),
-                    }
-                }
+                Command::News { id, chat_id } => bot
+                    .news_by_id(*id, chat_id.clone())
+                    .await
+                    .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
                 Command::CartoonAll => {
                     bot.cartoon_all(cartoon.limit, cartoon.min, cartoon.chat.clone())
                         .await
@@ -158,12 +132,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Command::Log => Ok(log::info!("log")),
             };
             if let Err(error) = result {
-                tg.send_message(
-                    debug_chat.clone(),
-                    format!("Error {} occurs in command {:?}", error, received),
-                )
-                .send()
-                .await?;
+                telegram
+                    .build()
+                    .await?
+                    .send_message(
+                        debug_chat.clone(),
+                        format!("Error {} occurs in command {:?}", error, received),
+                    )
+                    .send()
+                    .await?;
             }
         }
         Ok::<(), Error>(())
@@ -194,7 +171,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(schedule);
     tokio::spawn(recv);
-    repl.await;
+    repl.await?;
 
     Ok(())
 }

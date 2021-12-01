@@ -52,6 +52,7 @@ pub struct ApiServerConfig {
 pub struct TelegramConfig {
     pub webhook_url: Option<String>,
     pub listen_addr: Option<String>,
+    pub name: String,
     pub token: String,
     pub debug_chat: teloxide::types::ChatId,
 }
@@ -165,10 +166,6 @@ impl TelegraphConfig {
 impl TelegramConfig {
     pub async fn build(&self) -> Result<teloxide::Bot, Error> {
         let bot = teloxide::Bot::new(self.token.to_owned());
-        if let Some(url) = &self.webhook_url {
-            let url = Url::parse(&url)?;
-            bot.set_webhook(url).send().await?;
-        }
         Ok(bot)
     }
 
@@ -185,8 +182,46 @@ impl TelegramConfig {
         &self,
     ) -> impl teloxide::dispatching::update_listeners::UpdateListener<std::convert::Infallible>
     {
-        let listen_addr = self.listen_addr.as_ref().expect("Webhook address not set");
+        let listen_addr = self.listen_addr.as_ref().expect("Listen address not set");
         crate::telegram::listen_webhook(&listen_addr).await
+    }
+
+    pub async fn repl<Cmd, H, Fut, HandlerE>(&self, handler: H) -> Result<(), Error>
+    where
+        Cmd: teloxide::utils::command::BotCommand + Send + 'static,
+        H: Fn(teloxide::prelude::UpdateWithCx<teloxide::Bot, teloxide::types::Message>, Cmd) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: futures::Future<Output = Result<(), HandlerE>> + Send + 'static,
+        Result<(), HandlerE>: teloxide::error_handlers::OnError<HandlerE>,
+        HandlerE: core::fmt::Debug + Send,
+    {
+        let tg = self.build().await?;
+
+        if let Some(url) = &self.webhook_url {
+            let url = Url::parse(&url)?;
+            tg.set_webhook(url).send().await?;
+
+            let listener = self.listener().await;
+            
+            teloxide::commands_repl_with_listener::<teloxide::Bot, Cmd, H, Fut, _, _, HandlerE, _>(
+                tg,
+                self.name.clone(),
+                handler,
+                listener,
+            )
+            .await;
+        } else {
+            teloxide::commands_repl::<teloxide::Bot, Cmd, H, Fut, _, _>(
+                tg,
+                self.name.clone(),
+                handler,
+            )
+            .await;
+        }
+
+        Ok(())
     }
 }
 
@@ -248,8 +283,8 @@ impl BotConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
     use super::*;
+    use std::fs::File;
 
     #[test]
     fn test_deserialize_bot_config() {
@@ -258,10 +293,22 @@ mod tests {
 
         assert_eq!(bot_config.server.api.len(), 5);
         assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
-        assert_eq!(bot_config.telegram.webhook_url, Some("https://example.com/webhook".to_string()));
-        assert_eq!(bot_config.telegram.token, "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".to_string());
-        assert_eq!(bot_config.telegram.listen_addr, Some("127.0.0.1:5555".to_string()));
-        assert_eq!(bot_config.mongo.connection_string, "mongodb://localhost:27017".to_string());
+        assert_eq!(
+            bot_config.telegram.webhook_url,
+            Some("https://example.com/webhook".to_string())
+        );
+        assert_eq!(
+            bot_config.telegram.token,
+            "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".to_string()
+        );
+        assert_eq!(
+            bot_config.telegram.listen_addr,
+            Some("127.0.0.1:5555".to_string())
+        );
+        assert_eq!(
+            bot_config.mongo.connection_string,
+            "mongodb://localhost:27017".to_string()
+        );
         assert_eq!(bot_config.mongo.database, "test".to_string());
         assert_eq!(bot_config.tags.0.len(), 2);
     }

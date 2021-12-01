@@ -48,10 +48,6 @@ impl Client {
         &self.client
     }
 
-    pub fn news_server(&self) -> &Url {
-        &self.news_server
-    }
-
     pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
         self.client().get(url)
     }

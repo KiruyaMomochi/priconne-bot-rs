@@ -5,9 +5,9 @@ use futures::StreamExt;
 use linked_hash_set::LinkedHashSet;
 use priconne_core::{Error, Tagger};
 use std::pin::Pin;
-use telegraph_rs::doms_to_nodes;
+use telegraph_rs::{doms_to_nodes};
 use teloxide::types::{ChatId, Message};
-use utils::SplitPrefix;
+use utils::{replace_relative_path, SplitPrefix};
 
 pub struct NewsMessageBuilder<'a> {
     pub page: &'a NewsPageNoContent,
@@ -71,8 +71,13 @@ impl<C: NewsClient + Clone + Send> Bot<C> {
         let content;
         {
             let (p, c) = self.client.news_page_from_href(href).await?.split();
+            let url = self.client.news_url(href)?;
+            let nodes = &mut doms_to_nodes(c.children());
+            if let Some(node) = nodes {
+                replace_relative_path(&url, node)?;
+            };
             page = p;
-            content = serde_json::to_string(&doms_to_nodes(c.children()))?;
+            content = serde_json::to_string(&nodes)?;
         };
 
         let telegraph_page = self

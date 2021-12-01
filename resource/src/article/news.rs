@@ -45,7 +45,12 @@ async fn next_news_list<T: NewsExt>(
 
 #[async_trait]
 pub trait NewsClient: Sync {
-    async fn news_get(&self, href: &str) -> Result<Response, Error>;
+    fn news_server(&self) -> &url::Url;
+    async fn news_get(&self, href: &str) -> Result<Response, Error>;    
+
+    fn news_url(&self, href: &str) -> Result<url::Url, Error> {
+        self.news_server().join(href).map_err(Error::from)
+    }
 
     fn news_list_href(&self, page: i32) -> String {
         format!("news?page={page}", page = page)
@@ -81,6 +86,10 @@ pub trait NewsClient: Sync {
 
 #[async_trait::async_trait]
 impl NewsClient for Client {
+    fn news_server(&self) -> &url::Url {
+        &self.news_server
+    }
+
     async fn news_get(&self, href: &str) -> Result<Response, Error> {
         let url = self.news_server().join(href)?;
         let response = self.get(url).send().await?;

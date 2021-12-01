@@ -181,6 +181,39 @@ pub mod serde_as_string {
     }
 }
 
+pub fn replace_relative_path(
+    url: &url::Url,
+    nodes: &mut Vec<telegraph_rs::Node>,
+) -> Result<(), priconne_core::Error> {
+    for node in nodes {
+        if let telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+            tag: _,
+            attrs: Some(attrs),
+            children: _,
+        }) = node
+        {
+            if let Some(src) = attrs.get_mut("src") {
+                if src.starts_with("./") {
+                    *src = url.join(src)?.to_string();
+                }
+                if src.starts_with("/") && url.has_host() {
+                    *src = url.origin().unicode_serialization() + src;
+                }
+            }
+        }
+
+        if let telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+            tag: _,
+            attrs: _,
+            children: Some(children),
+        }) = node
+        {
+            replace_relative_path(url, children)?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -113,4 +113,18 @@ mod tests {
         assert_eq!(page.category, Some("活動".to_owned()));
         assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
     }
+
+    #[test]
+    fn test_from_1376() {
+        let path = Path::new("tests/news_1376.html");
+        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let page = NewsPage::from_document(document).unwrap();
+        let nodes = page.content.children();
+        let mut nodes = telegraph_rs::doms_to_nodes(nodes).unwrap();
+        utils::replace_relative_path(&url::Url::parse("https://example.com/1/2/3").unwrap(), &mut nodes).unwrap();
+
+        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 08, 24));
+        assert_eq!(page.category, Some("活動".to_owned()));
+        assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
+    }
 }
