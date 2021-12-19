@@ -1,57 +1,15 @@
-use std::{fmt, str::FromStr};
-
 use chrono::{DateTime, FixedOffset, TimeZone};
-use kuchiki::NodeData;
-use markup5ever::local_name;
 use serde::{
     de::{self, Visitor},
-    Deserialize, Deserializer,
+    Deserializer,
 };
+use std::{fmt, str::FromStr};
+
+mod html;
+pub use html::*;
 
 /// Number of seconds in an hour
 pub const HOUR: i32 = 3600;
-
-/// Trim leading space strings from a slibling node
-pub fn trim_leading_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
-    for slibling in sliblings {
-        match slibling.data() {
-            NodeData::Element(element_data) => match element_data.name.local {
-                local_name!("br") => slibling.detach(),
-                local_name!("div") => {
-                    if trim_leading_whitespace(slibling.children()) {
-                        return true;
-                    }
-                    if slibling.children().next().is_none() {
-                        slibling.detach();
-                    }
-                }
-                local_name!("p") => {
-                    if trim_leading_whitespace(slibling.children()) {
-                        return true;
-                    }
-                    if slibling.children().next().is_none() {
-                        slibling.detach();
-                    }
-                }
-                _ => return true,
-            },
-            NodeData::Text(text) => {
-                let mut value = text.borrow_mut();
-
-                *value = value.trim_start().to_string();
-
-                if value.is_empty() {
-                    slibling.detach();
-                } else {
-                    return true;
-                }
-            }
-            _ => continue,
-        }
-    }
-
-    false
-}
 
 /// Date format from priconne api server
 pub mod api_date_format {

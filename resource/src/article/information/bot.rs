@@ -77,6 +77,7 @@ impl<C: InformationClient + Clone + Send> Bot<C> {
         {
             let (p, c) = self.client.information_page(announce_id).await?.split();
             page = p;
+            utils::insert_br_after_div(&c);
             content = serde_json::to_string(&doms_to_nodes(c.children()))?;
         };
         info!("Got information page {}", page.title);

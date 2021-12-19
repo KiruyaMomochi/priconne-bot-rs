@@ -92,8 +92,8 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use kuchiki::traits::TendrilSink;
-    use utils::HOUR;
     use std::path::Path;
+    use utils::HOUR;
 
     #[test]
     fn test_information_page_from_document() {
@@ -103,8 +103,32 @@ mod tests {
         assert_eq!(page.title, "【活動】臺灣藝術家聯合會藝術研習班");
         assert_eq!(
             page.date,
-            Some(FixedOffset::east(8 * HOUR).ymd(2021, 10, 19).and_hms(11, 55, 0))
+            Some(
+                FixedOffset::east(8 * HOUR)
+                    .ymd(2021, 10, 19)
+                    .and_hms(11, 55, 0)
+            )
         );
         assert_eq!(page.icon, Some(Icon::Activity));
+    }
+
+    #[tokio::test]
+    async fn test_information_page_from_document_div() {
+        let path = Path::new("tests/information_div.html");
+        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let page = InformationPage::from_document(document).unwrap();
+
+        utils::insert_br_after_div(&page.content);
+        let content = telegraph_rs::doms_to_nodes(page.content.children().clone()).unwrap();
+        println!("{:?}", content);
+        let json = serde_json::to_string(&content).unwrap();
+        let telegraph = telegraph_rs::Telegraph::new("test")
+            .create()
+            .await
+            .unwrap()
+            .create_page(&page.title, &json, false)
+            .await
+            .unwrap();
+        println!("{}", telegraph.url);
     }
 }

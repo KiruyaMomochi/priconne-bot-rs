@@ -73,8 +73,8 @@ impl<C: NewsClient + Clone + Send> Bot<C> {
             let (p, c) = self.client.news_page_from_href(href).await?.split();
             let url = self.client.news_url(href)?;
             let nodes = &mut doms_to_nodes(c.children());
-            if let Some(node) = nodes {
-                replace_relative_path(&url, node)?;
+            if let Some(nodes) = nodes {
+                replace_relative_path(&url, nodes)?;
             };
             page = p;
             content = serde_json::to_string(&nodes)?;
