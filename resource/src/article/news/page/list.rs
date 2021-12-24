@@ -13,7 +13,7 @@ pub struct NewsList {
 }
 
 impl Page for NewsList {
-    fn from_document(document: NodeRef) -> Result<Self, Error> {
+    fn from_document(document: NodeRef) -> Result<(Self, NodeRef), Error> {
         let pagging_node = document
             .select_first(".paging")
             .map_err(|_| Error::KuchikiError)?;
@@ -32,12 +32,12 @@ impl Page for NewsList {
         let dl_node = dl_node.as_node();
         let result = node_to_news_list(dl_node)?;
 
-        Ok(Self {
+        Ok((Self {
             current_page: page,
             news_list: result,
             next_href: next_page_href,
             prev_href: prev_page_href,
-        })
+        }, document))
     }
 }
 
@@ -106,7 +106,7 @@ mod tests {
             .from_file(path)
             .unwrap();
 
-        let result = NewsList::from_document(document).unwrap();
+        let (result, _) = NewsList::from_document(document).unwrap();
         println!("{:#?}", result);
 
         assert_eq!(result.current_page, 1);

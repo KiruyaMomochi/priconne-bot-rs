@@ -4,7 +4,7 @@ mod page;
 
 pub use list::NewsList;
 pub use news::News;
-pub use page::{NewsPage, NewsPageNoContent};
+pub use page::NewsPage;
 
 use kuchiki::NodeRef;
 use priconne_core::Error;

@@ -25,7 +25,7 @@ pub trait InformationClient: Sync {
         format!("information/ajax_announce?offset={offset}", offset = offset)
     }
 
-    async fn information_page(&self, announce_id: i32) -> Result<InformationPage, Error> {
+    async fn information_page(&self, announce_id: i32) -> Result<(InformationPage, kuchiki::NodeRef), Error> {
         let href = self.information_href(announce_id);
         let html = self.information_get(&href).await?.text().await?;
 

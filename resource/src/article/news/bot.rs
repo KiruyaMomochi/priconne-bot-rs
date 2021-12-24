@@ -10,7 +10,7 @@ use teloxide::types::{ChatId, Message};
 use utils::{replace_relative_path, SplitPrefix};
 
 pub struct NewsMessageBuilder<'a> {
-    pub page: &'a NewsPageNoContent,
+    pub page: &'a NewsPage,
     pub news_id: i32,
     pub telegraph_page: &'a telegraph_rs::Page,
     pub tagger: &'a Tagger,
@@ -53,7 +53,7 @@ impl<'a> MessageBuilder for NewsMessageBuilder<'a> {
 pub struct SentNews {
     message: Message,
     telegraph: telegraph_rs::Page,
-    page: NewsPageNoContent,
+    page: NewsPage,
 }
 
 impl<C: NewsClient + Clone + Send> Bot<C> {
@@ -70,7 +70,7 @@ impl<C: NewsClient + Clone + Send> Bot<C> {
         let page;
         let content;
         {
-            let (p, c) = self.client.news_page_from_href(href).await?.split();
+            let (p, c) = self.client.news_page_from_href(href).await?;
             let url = self.client.news_url(href)?;
             let nodes = &mut doms_to_nodes(c.children());
             if let Some(nodes) = nodes {
@@ -152,7 +152,7 @@ impl<C: NewsClient + Clone + Send> Bot<C> {
     }
 }
 
-fn tags<'a>(page: &'a NewsPageNoContent, tagger: &'a Tagger) -> (&'a str, Vec<String>) {
+fn tags<'a>(page: &'a NewsPage, tagger: &'a Tagger) -> (&'a str, Vec<String>) {
     let mut title: &str = &page.title;
     let mut tags: LinkedHashSet<String> = LinkedHashSet::new();
 

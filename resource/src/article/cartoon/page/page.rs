@@ -7,7 +7,7 @@ pub struct CartoonPage {
 }
 
 impl Page for CartoonPage {
-    fn from_document(document: kuchiki::NodeRef) -> Result<Self, Error> {
+    fn from_document(document: kuchiki::NodeRef) -> Result<(Self, kuchiki::NodeRef), Error> {
         let main_cartoon_node = document
             .select_first(".main_cartoon")
             .map_err(|_| Error::KuchikiError)?;
@@ -30,7 +30,7 @@ impl Page for CartoonPage {
             .ok_or(Error::KuchikiError)?
             .to_owned();
 
-        Ok(Self { id: episode, image_src })
+        Ok((Self { id: episode, image_src }, main_cartoon_node.as_node().clone()))
     }
 }
 
@@ -95,7 +95,7 @@ window.detail_current_pager = 1;
 </html>
         "#);
 
-        let page = CartoonPage::from_document(document).unwrap();
+        let page = CartoonPage::from_document(document).unwrap().0;
 
         assert_eq!(page.id, "254");
         assert_eq!(

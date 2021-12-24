@@ -73,7 +73,7 @@ pub trait CartoonClient: Sync {
         let href = Self::cartoon_detail_href(id);
         let html = self.cartoon_get(&href).await?.text().await?;
 
-        CartoonPage::from_html(html)
+        CartoonPage::from_html(html).map(|(cartoon, _)| cartoon)
     }
 }
 

@@ -17,7 +17,7 @@ use super::{Announce, InformationClient, InformationExt};
 
 #[derive(Debug)]
 pub struct InformationMessageBuilder<'a> {
-    pub page: &'a InformationPageNoContent,
+    pub page: &'a InformationPage,
     pub announce_id: i32,
     pub telegraph_page: &'a telegraph_rs::Page,
     pub tagger: &'a Tagger,
@@ -61,7 +61,7 @@ impl<'a> MessageBuilder for InformationMessageBuilder<'a> {
 pub struct SentInformation {
     message: Message,
     telegraph: telegraph_rs::Page,
-    page: InformationPageNoContent,
+    page: InformationPage,
 }
 
 impl<C: InformationClient + Clone + Send> Bot<C> {
@@ -75,9 +75,10 @@ impl<C: InformationClient + Clone + Send> Bot<C> {
         let page;
         let content;
         {
-            let (p, c) = self.client.information_page(announce_id).await?.split();
+            let (p, c) = self.client.information_page(announce_id).await?;
             page = p;
             utils::insert_br_after_div(&c);
+
             content = serde_json::to_string(&doms_to_nodes(c.children()))?;
         };
         info!("Got information page {}", page.title);
@@ -172,7 +173,7 @@ impl<C: InformationClient + Clone + Send> Bot<C> {
     }
 }
 
-fn tags<'a>(page: &'a InformationPageNoContent, tagger: &'a Tagger) -> (&'a str, Vec<String>) {
+fn tags<'a>(page: &'a InformationPage, tagger: &'a Tagger) -> (&'a str, Vec<String>) {
     let mut title: &str = &page.title;
     let mut tags: LinkedHashSet<String> = LinkedHashSet::new();
 

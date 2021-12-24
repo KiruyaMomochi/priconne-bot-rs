@@ -9,18 +9,10 @@ pub struct InformationPage {
     pub title: String,
     pub icon: Option<Icon>,
     pub date: Option<DateTime<FixedOffset>>,
-    pub content: kuchiki::NodeRef,
-}
-
-#[derive(Debug)]
-pub struct InformationPageNoContent {
-    pub title: String,
-    pub icon: Option<Icon>,
-    pub date: Option<DateTime<FixedOffset>>,
 }
 
 impl Page for InformationPage {
-    fn from_document(document: NodeRef) -> Result<Self, Error> {
+    fn from_document(document: NodeRef) -> Result<(Self, kuchiki::NodeRef), Error> {
         let messages_node = document
             .select_first(".messages")
             .map_err(|_| Error::KuchikiError)?;
@@ -39,25 +31,11 @@ impl Page for InformationPage {
             return Err(Error::EmptyTitleError);
         }
 
-        Ok(InformationPage {
+        Ok((Self {
             title: get_title(&title_node)?,
             date: get_date(&date_node),
             icon: get_icon(&date_node),
-            content,
-        })
-    }
-}
-
-impl InformationPage {
-    pub fn split(self) -> (InformationPageNoContent, kuchiki::NodeRef) {
-        (
-            InformationPageNoContent {
-                date: self.date,
-                icon: self.icon,
-                title: self.title,
-            },
-            self.content,
-        )
+        }, content))
     }
 }
 
@@ -99,7 +77,7 @@ mod tests {
     fn test_information_page_from_document() {
         let path = Path::new("tests/information_page.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let page = InformationPage::from_document(document).unwrap();
+        let (page, content) = InformationPage::from_document(document).unwrap();
         assert_eq!(page.title, "【活動】臺灣藝術家聯合會藝術研習班");
         assert_eq!(
             page.date,
@@ -116,10 +94,10 @@ mod tests {
     async fn test_information_page_from_document_div() {
         let path = Path::new("tests/information_div.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let page = InformationPage::from_document(document).unwrap();
+        let (page, content) = InformationPage::from_document(document).unwrap();
 
-        utils::insert_br_after_div(&page.content);
-        let content = telegraph_rs::doms_to_nodes(page.content.children().clone()).unwrap();
+        utils::insert_br_after_div(&content);
+        let content = telegraph_rs::doms_to_nodes(content.children().clone()).unwrap();
         println!("{:?}", content);
         let json = serde_json::to_string(&content).unwrap();
         let telegraph = telegraph_rs::Telegraph::new("test")

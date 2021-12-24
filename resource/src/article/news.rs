@@ -37,7 +37,7 @@ async fn next_news_list<T: NewsExt>(
     let response = client.news_get(&href).await.ok()?;
     let text = response.text().await.ok()?;
     let document = kuchiki::parse_html().one(text);
-    let news_list = NewsList::from_document(document).ok()?;
+    let news_list = NewsList::from_document(document).ok()?.0;
     let next_href = news_list.next_href.clone();
 
     Some((news_list, (next_href, client)))
@@ -59,14 +59,14 @@ pub trait NewsClient: Sync {
         format!("news/newsDetail/{news_id}", news_id = news_id)
     }
 
-    async fn news_page(&self, news_id: i32) -> Result<NewsPage, Error> {
+    async fn news_page(&self, news_id: i32) -> Result<(NewsPage, kuchiki::NodeRef), Error> {
         let href = self.news_detail_href(news_id);
         let html = self.news_get(&href).await?.text().await?;
 
         NewsPage::from_html(html)
     }
 
-    async fn news_page_from_href(&self, href: &str) -> Result<NewsPage, Error> {
+    async fn news_page_from_href(&self, href: &str) -> Result<(NewsPage, kuchiki::NodeRef), Error> {
         let html = self.news_get(&href).await?.text().await?;
 
         NewsPage::from_html(html)
@@ -76,7 +76,7 @@ pub trait NewsClient: Sync {
         let href = self.news_list_href(page);
         let html = self.news_get(&href).await?.text().await?;
 
-        NewsList::from_html(html)
+        NewsList::from_html(html).map(|(news_list, _)| news_list)
     }
 
     async fn news_list(&self, page: i32) -> Result<Vec<News>, Error> {

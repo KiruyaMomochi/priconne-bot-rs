@@ -9,18 +9,10 @@ pub struct NewsPage {
     pub date: Date<FixedOffset>,
     pub category: Option<String>,
     pub title: String,
-    pub content: kuchiki::NodeRef,
-}
-
-#[derive(Debug)]
-pub struct NewsPageNoContent {
-    pub date: Date<FixedOffset>,
-    pub category: Option<String>,
-    pub title: String,
 }
 
 impl Page for NewsPage {
-    fn from_document(document: NodeRef) -> Result<Self, Error> {
+    fn from_document(document: NodeRef) -> Result<(Self, kuchiki::NodeRef), Error> {
         let news_con_node = document
             .select_first(".news_con")
             .map_err(|_| Error::KuchikiError)?;
@@ -55,25 +47,11 @@ impl Page for NewsPage {
 
         let news = Self {
             category,
-            content,
             date,
             title,
         };
 
-        Ok(news)
-    }
-}
-
-impl NewsPage {
-    pub fn split(self) -> (NewsPageNoContent, kuchiki::NodeRef) {
-        (
-            NewsPageNoContent {
-                category: self.category,
-                date: self.date,
-                title: self.title,
-            },
-            self.content,
-        )
+        Ok((news, content))
     }
 }
 
@@ -108,7 +86,7 @@ mod tests {
     fn test_from_document() {
         let path = Path::new("tests/news_page.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let page = NewsPage::from_document(document).unwrap();
+        let (page, content) = NewsPage::from_document(document).unwrap();
         assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 08, 24));
         assert_eq!(page.category, Some("活動".to_owned()));
         assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
@@ -118,8 +96,8 @@ mod tests {
     fn test_from_1376() {
         let path = Path::new("tests/news_1376.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let page = NewsPage::from_document(document).unwrap();
-        let nodes = page.content.children();
+        let (page, content) = NewsPage::from_document(document).unwrap();
+        let nodes = content.children();
         let mut nodes = telegraph_rs::doms_to_nodes(nodes).unwrap();
         utils::replace_relative_path(&url::Url::parse("https://example.com/1/2/3").unwrap(), &mut nodes).unwrap();
 
