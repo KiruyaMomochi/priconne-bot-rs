@@ -1,4 +1,5 @@
 use super::{get_category, get_date};
+use crate::event::{get_events, EventPeriod};
 use chrono::{Date, FixedOffset};
 use kuchiki::{ElementData, NodeDataRef, NodeRef};
 use priconne_core::{Error, Page};
@@ -9,6 +10,7 @@ pub struct NewsPage {
     pub date: Date<FixedOffset>,
     pub category: Option<String>,
     pub title: String,
+    pub events: Vec<EventPeriod>,
 }
 
 impl Page for NewsPage {
@@ -45,10 +47,13 @@ impl Page for NewsPage {
             .map_err(|_| Error::KuchikiError)?;
         let content = get_content(&section_node)?.clone();
 
+        let events = get_events(&section_node);
+
         let news = Self {
             category,
             date,
             title,
+            events,
         };
 
         Ok((news, content))
@@ -79,30 +84,35 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use kuchiki::traits::TendrilSink;
-    use utils::HOUR;
     use std::path::Path;
+    use utils::HOUR;
 
     #[test]
     fn test_from_document() {
         let path = Path::new("tests/news_page.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, content) = NewsPage::from_document(document).unwrap();
+        let (page, _) = NewsPage::from_document(document).unwrap();
         assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 08, 24));
         assert_eq!(page.category, Some("活動".to_owned()));
-        assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
+        assert_eq!(
+            page.title,
+            "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned()
+        );
+        assert_eq!(page.events.len(), 1);
     }
 
     #[test]
     fn test_from_1376() {
         let path = Path::new("tests/news_1376.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, content) = NewsPage::from_document(document).unwrap();
-        let nodes = content.children();
-        let mut nodes = telegraph_rs::doms_to_nodes(nodes).unwrap();
-        utils::replace_relative_path(&url::Url::parse("https://example.com/1/2/3").unwrap(), &mut nodes).unwrap();
+        let (page, _) = NewsPage::from_document(document).unwrap();
 
-        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 08, 24));
+        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 10, 26));
         assert_eq!(page.category, Some("活動".to_owned()));
-        assert_eq!(page.title, "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned());
+        assert_eq!(
+            page.title,
+            "【活動】《10月戰隊競賽》限定加碼！特別排名活動".to_owned()
+        );
+        assert_eq!(page.events.len(), 1);
     }
 }

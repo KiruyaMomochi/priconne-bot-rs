@@ -2,6 +2,7 @@ use chrono::{DateTime, FixedOffset};
 use kuchiki::{ElementData, NodeDataRef, NodeRef};
 
 use super::Icon;
+use crate::event::{EventPeriod, get_events};
 use priconne_core::{Error, Page};
 
 #[derive(Debug)]
@@ -9,6 +10,7 @@ pub struct InformationPage {
     pub title: String,
     pub icon: Option<Icon>,
     pub date: Option<DateTime<FixedOffset>>,
+    pub events: Vec<EventPeriod>,
 }
 
 impl Page for InformationPage {
@@ -31,11 +33,15 @@ impl Page for InformationPage {
             return Err(Error::EmptyTitleError);
         }
 
-        Ok((Self {
-            title: get_title(&title_node)?,
-            date: get_date(&date_node),
-            icon: get_icon(&date_node),
-        }, content))
+        Ok((
+            Self {
+                title: get_title(&title_node)?,
+                date: get_date(&date_node),
+                icon: get_icon(&date_node),
+                events: get_events(&messages_node),
+            },
+            content,
+        ))
     }
 }
 
@@ -77,36 +83,42 @@ mod tests {
     fn test_information_page_from_document() {
         let path = Path::new("tests/information_page.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, content) = InformationPage::from_document(document).unwrap();
-        assert_eq!(page.title, "【活動】臺灣藝術家聯合會藝術研習班");
+        let (page, _) = InformationPage::from_document(document).unwrap();
+        assert_eq!(
+            page.title,
+            "【活動】特別活動「軍團之戰」舉辦中！(12/18更新)"
+        );
         assert_eq!(
             page.date,
             Some(
                 FixedOffset::east(8 * HOUR)
-                    .ymd(2021, 10, 19)
+                    .ymd(2021, 12, 17)
                     .and_hms(11, 55, 0)
             )
         );
-        assert_eq!(page.icon, Some(Icon::Activity));
+        assert_eq!(page.icon, Some(Icon::Special));
+        assert_eq!(page.events.len(), 1);
     }
 
     #[tokio::test]
     async fn test_information_page_from_document_div() {
         let path = Path::new("tests/information_div.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, content) = InformationPage::from_document(document).unwrap();
+        let (page, _) = InformationPage::from_document(document).unwrap();
 
-        utils::insert_br_after_div(&content);
-        let content = telegraph_rs::doms_to_nodes(content.children().clone()).unwrap();
-        println!("{:?}", content);
-        let json = serde_json::to_string(&content).unwrap();
-        let telegraph = telegraph_rs::Telegraph::new("test")
-            .create()
-            .await
-            .unwrap()
-            .create_page(&page.title, &json, false)
-            .await
-            .unwrap();
-        println!("{}", telegraph.url);
+        assert_eq!(
+            page.title,
+            "【活動】「12月戰隊競賽」模式變更開始預告！"
+        );
+        assert_eq!(
+            page.date,
+            Some(
+                FixedOffset::east(8 * HOUR)
+                    .ymd(2021, 12, 19)
+                    .and_hms(11, 55, 0)
+            )
+        );
+        assert_eq!(page.icon, Some(Icon::Activity));
+        assert_eq!(page.events.len(), 3);
     }
 }

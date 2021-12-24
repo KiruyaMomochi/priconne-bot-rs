@@ -37,15 +37,36 @@ impl<'a> MessageBuilder for NewsMessageBuilder<'a> {
             tag_str.push('\n');
         }
 
-        let message = format!(
-            "{tag}<b>{title}</b>\n{link}\n{time} <code>News#{id}</code>",
+        let mut event_str = String::new();
+
+        for event in &self.page.events {
+            event_str.push_str("- ");
+            event_str.push_str(&event.name);
+            event_str.push_str(": \n   ");
+            event_str.push_str(event.start.format("%m/%d %H:%M").to_string().as_str());
+            event_str.push_str(" - ");
+            event_str.push_str(event.end.format("%m/%d %H:%M").to_string().as_str());
+            event_str.push_str("\n");
+        }
+        if !event_str.is_empty() {
+            event_str.insert_str(0, "\n");
+            event_str.push_str("\n");
+        }
+        
+        let head = format!(
+            "{tag}<b>{title}</b>\n",
             tag = tag_str,
-            title = title,
+            title = title
+        );
+
+        let tail = format!(
+            "{link}\n{time} <code>News#{id}</code>",
             link = link,
             time = time,
             id = id
         );
 
+        let message = format!("{}{}{}", head, event_str, tail);
         message
     }
 }
