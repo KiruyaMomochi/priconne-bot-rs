@@ -2515,9 +2515,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "env_logger",
+ "html5ever",
  "kuchiki",
  "log",
- "markup5ever",
  "mongodb",
  "priconne-core",
  "serde",
