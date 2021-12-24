@@ -30,6 +30,8 @@ enum TelegramCommand {
     Cartoon { id: i32 },
     #[command(description = "get news by id.", parse_with = "split")]
     News { id: i32 },
+    #[command(description = "get information by id.", parse_with = "split")]
+    Information { id: i32 },
     #[command(description = "send all cartoons.")]
     CartoonAll,
     #[command(description = "send all articles.")]
@@ -61,6 +63,12 @@ async fn answer(
                 chat_id: cx.update.chat_id().into(),
             })
             .map_err(|_| Error::SendError)?,
+        TelegramCommand::Information { id } => tx
+            .send(Command::Information {
+                id,
+                chat_id: cx.update.chat_id().into(),
+            })
+            .map_err(|_| Error::SendError)?,
         TelegramCommand::CartoonAll => {
             tx.send(Command::CartoonAll).map_err(|_| Error::SendError)?
         }
@@ -78,6 +86,7 @@ async fn answer(
 enum Command {
     Cartoon { id: i32, chat_id: ChatId },
     News { id: i32, chat_id: ChatId },
+    Information { id: i32, chat_id: ChatId },
     CartoonAll,
     ArticleAll,
     NewsAll,
@@ -119,6 +128,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .news_by_id(*id, chat_id.clone())
                     .await
                     .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
+                Command::Information { id, chat_id } => bot
+                    .announce_by_id(*id, chat_id.clone())
+                    .await
+                    .map_or_else(|error| Err(Error::from(error)), |_| Ok(())),
                 Command::CartoonAll => {
                     bot.cartoon_all(cartoon.limit, cartoon.min, cartoon.chat.clone())
                         .await
@@ -151,9 +164,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             Action::new_local(config.resources.information.schedules.clone(), || {
                 tx.clone().send(Command::ArticleAll).unwrap()
             });
-        let mut cartoon_action = Action::new_local(config.resources.cartoon.schedules.clone(), || {
-            tx.clone().send(Command::CartoonAll).unwrap()
-        });
+        let mut cartoon_action =
+            Action::new_local(config.resources.cartoon.schedules.clone(), || {
+                tx.clone().send(Command::CartoonAll).unwrap()
+            });
         let mut news_action = Action::new_local(config.resources.news.schedules.clone(), || {
             tx.clone().send(Command::NewsAll).unwrap()
         });
