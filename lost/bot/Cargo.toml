@@ -1,0 +1,34 @@
+[package]
+name = "bot"
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utils = { path = "../utils" }
+scheduler = { path = "../scheduler", features = ["serde"] }
+priconne-core = { path = "../priconne-core" }
+resource = { path = "../resource" }
+db = { path = "../db" }
+chrono.workspace = true
+cron.workspace = true
+pretty_env_logger.workspace = true
+futures.workspace = true
+http.workspace = true
+log.workspace = true
+mongodb.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+serde_with.workspace = true
+telegraph-rs.workspace = true
+teloxide.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+url.workspace = true
+warp.workspace = true
+linked_hash_set.workspace = true

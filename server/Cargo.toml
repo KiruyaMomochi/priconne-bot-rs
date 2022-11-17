@@ -1,0 +1,26 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.5.8"
+axum-core = "0.2.6"
+tokio.workspace = true
+tokio-stream.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+teloxide = { workspace = true, features = [
+  "auto-send",
+  "macros",
+  "webhooks-axum",
+] }
+url.workspace = true
+
+# [patch.crates-io]
+# "axum" = { version = "0.5.8" }
+# "axum-core" = { version = "0.2.6" }
