@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.5.8"
-axum-core = "0.2.6"
+axum = "0.6.4"
+axum-core = "0.3.2"
 tokio.workspace = true
 tokio-stream.workspace = true
 serde.workspace = true

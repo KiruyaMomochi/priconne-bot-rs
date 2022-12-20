@@ -80,23 +80,24 @@ pub mod chrono_date_utc8_as_bson_datetime {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::result::Result;
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::Date<FixedOffset>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::NaiveDate, D::Error>
     where
         D: Deserializer<'de>,
     {
         let datetime = DateTime::deserialize(deserializer)?;
-        let timezone = chrono::FixedOffset::east(8 * HOUR);
+        let timezone = chrono::FixedOffset::east_opt(8 * HOUR).unwrap();
         let datetime = datetime.to_chrono().with_timezone(&timezone);
-        Ok(datetime.date())
+        Ok(datetime.date_naive())
     }
 
     /// Serializes a [`chrono::Date`] as a [`bson::DateTime`].
     pub fn serialize<S: Serializer>(
-        val: &chrono::Date<FixedOffset>,
+        val: &chrono::NaiveDate,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        let datetime = val.and_hms(0, 0, 0);
-        let datetime = DateTime::from_chrono(datetime.with_timezone(&Utc));
+        let datetime = val.and_hms_opt(0, 0, 0).unwrap();
+        let timezone = chrono::FixedOffset::east_opt(8 * HOUR).unwrap();
+        let datetime = DateTime::from_chrono(datetime.and_local_timezone(timezone).unwrap());
         datetime.serialize(serializer)
     }
 }

@@ -1,13 +1,14 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, TryStreamExt, StreamExt};
+use futures::{stream::BoxStream, StreamExt, TryStreamExt};
 
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     resource::{
-        cartoon::{CartoonPage, Thumbnail, ThumbnailList, PagerTop, PagerDetail},
-        information::{Announce, InformationPage, AjaxAnnounceList}, post::PostSource,
+        cartoon::{CartoonPage, PagerDetail, PagerTop, Thumbnail, ThumbnailList},
+        information::{AjaxAnnounceList, Announce, InformationPage},
+        post::{sources::Source, PostPageResponse},
     },
     Error, Page,
 };
@@ -27,12 +28,12 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
-    async fn information_get(&self, href: &str) -> Result<Response, Error> {
+    async fn get_information_raw(&self, href: &str) -> Result<Response, Error> {
         let url = self.api_server.url.join(href)?;
         self.client.get(url).send().await.map_err(Error::from)
     }
 
-        fn information_href(&self, announce_id: i32) -> String {
+    fn information_href(&self, announce_id: i32) -> String {
         format!(
             "information/detail/{announce_id}/1/10/1",
             announce_id = announce_id
@@ -43,19 +44,27 @@ impl ApiClient {
         format!("information/ajax_announce?offset={offset}", offset = offset)
     }
 
-    pub async fn information(
+    pub async fn get_information(
         &self,
         announce_id: i32,
-    ) -> Result<(InformationPage, kuchiki::NodeRef), Error> {
+    ) -> Result<PostPageResponse<InformationPage>, Error> {
         let href = self.information_href(announce_id);
-        let html = self.information_get(&href).await?.text().await?;
+        let response = self.get_information_raw(&href).await?;
+        let url = response.url().clone();
+        let html = response.text().await?;
 
-        InformationPage::from_html(html)
+        let response = PostPageResponse {
+            source: Source::Announce(self.api_server.id.clone()),
+            url,
+            page: InformationPage::from_html(html)?,
+        };
+
+        Ok(response)
     }
 
     pub async fn ajax_announce_list(&self, offset: i32) -> Result<AjaxAnnounceList, Error> {
         let href = self.ajax_href(offset);
-        self.information_get(&href)
+        self.get_information_raw(&href)
             .await?
             .json::<AjaxAnnounceList>()
             .await
@@ -82,9 +91,7 @@ impl ApiClient {
         Box::pin(stream)
     }
 
-    pub fn announce_try_stream(
-        &self,
-    ) -> BoxStream<Result<Announce, Error>> {
+    pub fn announce_try_stream(&self) -> BoxStream<Result<Announce, Error>> {
         let stream = futures::stream::try_unfold((0, self), try_next_ajax);
         let stream = stream
             .map_ok(|ajax_announce| {
@@ -198,7 +205,7 @@ impl ApiClient {
         let href = Self::cartoon_detail_href(id);
         let html = self.cartoon_get(&href).await?.text().await?;
 
-        CartoonPage::from_html(html).map(|(cartoon, _)| cartoon)
+        CartoonPage::from_html(html)
     }
 
     pub fn thumbnail_stream(&self) -> BoxStream<Thumbnail> {
@@ -237,88 +244,79 @@ async fn try_next_thumbnails(
 
 #[async_trait]
 impl ResourceClient<Announce> for ApiClient {
-    type P = (InformationPage, kuchiki::NodeRef);
+    type Response = PostPageResponse<InformationPage>;
     fn try_stream(&self) -> BoxStream<Result<Announce, Error>> {
         self.announce_try_stream()
     }
-    async fn page(&self, resource: &Announce) -> Result<Self::P, Error> {
-        self.information(resource.announce_id).await
-    }
-}
-
-impl PostSource<Announce> for ApiClient {
-    fn post_source(&self) -> crate::resource::post::sources::Source {
-        crate::resource::post::sources::Source::Announce(self.api_server.id.clone())
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
+        self.get_information(id).await
     }
 }
 
 #[async_trait]
 impl ResourceClient<Thumbnail> for ApiClient {
-    type P = CartoonPage;
+    type Response = CartoonPage;
     fn try_stream(&self) -> BoxStream<Result<Thumbnail, Error>> {
         self.thumbnail_try_stream()
     }
-    async fn page(&self, resource: &Thumbnail) -> Result<Self::P, Error> {
-        self.cartoon(resource.id).await
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
+        self.cartoon(id).await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        service::resource::{ResourceService},
-        FetchStrategy,
-    };
+    use crate::{service::resource::ResourceService, FetchStrategy};
 
     use super::*;
     use futures::{stream, StreamExt, TryStreamExt};
 
-    #[tokio::test]
-    async fn test_try_stream_and_then() {
-        let stream = stream::iter(vec![Ok(1), Ok(2), Err(3)]);
-        let stream = stream.and_then(|x| async move { Ok(x + 1) });
-        let vec = stream.collect::<Vec<_>>().await;
-        println!("{:?}", vec);
-    }
+    // #[tokio::test]
+    // async fn test_try_stream_and_then() {
+    //     let stream = stream::iter(vec![Ok(1), Ok(2), Err(3)]);
+    //     let stream = stream.and_then(|x| async move { Ok(x + 1) });
+    //     let vec = stream.collect::<Vec<_>>().await;
+    //     println!("{:?}", vec);
+    // }
 
-    #[tokio::test]
-    async fn test_latest_rua() -> Result<(), Box<dyn std::error::Error>> {
-        let collection = crate::database::test::init_db()
-            .await?
-            .collection::<Announce>("announce");
+    // #[tokio::test]
+    // async fn test_latest_rua() -> Result<(), Box<dyn std::error::Error>> {
+    //     let collection = crate::database::test::init_db()
+    //         .await?
+    //         .collection::<Announce>("announce");
 
-        let client = ApiClient {
-            client: reqwest::Client::builder()
-                .user_agent(crate::client::ua())
-                .build()?,
-            api_server: ApiServer {
-                id: "PROD1".to_string(),
-                url: reqwest::Url::parse("https://api-pc.so-net.tw/")?,
-                name: "美食殿堂".to_string(),
-            },
-        };
+    //     let client = ApiClient {
+    //         client: reqwest::Client::builder()
+    //             .user_agent(crate::client::ua())
+    //             .build()?,
+    //         api_server: ApiServer {
+    //             id: "PROD1".to_string(),
+    //             url: reqwest::Url::parse("https://api-pc.so-net.tw/")?,
+    //             name: "美食殿堂".to_string(),
+    //         },
+    //     };
 
-        let strategy = FetchStrategy {
-            fuse_limit: 5,
-            ignore_id_lt: 1852,
-        };
+    //     let strategy = FetchStrategy {
+    //         fuse_limit: 5,
+    //         ignore_id_lt: 1852,
+    //     };
 
-        let service = ResourceService::new(client, strategy, collection);
+    //     let service = ResourceService::new(client, strategy, collection);
 
-        let mut announces = service.latests().await?;
-        println!("{:?}", announces);
-        for mut announce in announces.iter_mut().rev().take(5) {
-            announce.title.title = "So-net 不會用的標題".to_string();
-        }
-        for announce in announces.iter() {
-            service.collection.upsert(announce).await?;
-        }
+    //     let mut announces = service.latests().await?;
+    //     println!("{:?}", announces);
+    //     for mut announce in announces.iter_mut().rev().take(5) {
+    //         announce.title.title = "So-net 不會用的標題".to_string();
+    //     }
+    //     for announce in announces.iter() {
+    //         service.collection.upsert(announce).await?;
+    //     }
 
-        let (page, _node) = service.page(&announces[0]).await?;
-        tracing::info!("{:?}", page);
+    //     let (page, _node) = service.page(&announces[0]).await?;
+    //     tracing::info!("{:?}", page);
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     //     #[tokio::test]
     //     async fn test_latest_announces() -> Result<(), Box<dyn std::error::Error>> {

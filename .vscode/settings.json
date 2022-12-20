@@ -1,5 +1,4 @@
 {
-    "debug.allowBreakpointsEverywhere": true,
     "editor.formatOnType": true,
     "editor.formatOnPaste": true
 }

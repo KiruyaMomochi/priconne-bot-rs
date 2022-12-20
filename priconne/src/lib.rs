@@ -1,18 +1,16 @@
 mod error;
-mod event;
 mod page;
 mod service;
-mod tagging;
 mod utils;
 
 mod database;
 pub mod resource;
+pub mod insight;
 pub mod message;
 
 pub use error::Error;
 pub use page::Page;
 pub use service::*;
-pub use tagging::{extract_tag, RegexTagger};
 
 // Use of a mod or pub mod is not actually necessary.
 pub mod built_info {

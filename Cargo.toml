@@ -24,7 +24,7 @@ tracing-futures = "0.2"
 
 # Parsing
 kuchiki = "0.8.1"
-html5ever = "0.25.0"
+html5ever = "0.26.0"
 regex = "1"
 toml = "0.5.8"
 url = "2.2.2"
@@ -41,7 +41,7 @@ warp = "0.3.2"
 reqwest = "0.11.4"
 
 telegraph-rs = { git = "https://github.com/KiruyaMomochi/telegraph-rs" }
-teloxide = { version = "0.10.0", features = ["auto-send", "macros"] }
+teloxide = { version = "0.12.0", features = ["auto-send", "macros"] }
 # teloxide = { git = "https://github.com/KiruyaMomochi/teloxide", branch = "patch-1", features = ["auto-send", "macros"] }
 
 # Misc
@@ -49,7 +49,7 @@ chrono = { version = "0.4.19", default-features = false, features = [
     "clock",
     "serde",
 ] }
-cron = "0.11.0"
+cron = "0.12.0"
 thiserror = "1.0"
 linked_hash_set = { version="0.1.4", features = ["serde"] }
 

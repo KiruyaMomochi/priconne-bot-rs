@@ -1,29 +1,33 @@
 pub mod api;
 pub mod news;
-pub mod post;
 pub mod resource;
 
 use std::iter;
 
+use async_trait::async_trait;
 use futures::StreamExt;
 
 use serde::{Deserialize, Serialize};
-use teloxide::types::Recipient;
+use teloxide::{payloads::SendMessageSetters, requests::Requester, types::Recipient};
 
 use crate::{
     database::PostCollection,
     error::Error,
-    message::MessageBuilder,
+    insight::{Extractor, PostData},
     resource::{
         cartoon::Thumbnail,
         information::Announce,
         news::News,
-        post::{sources, Post},
-        Resource,
-    },
+        post::{Post, sources::Source},
+        update::{ActionBuilder, ResourceFindResult},
+    }, message::ChatManager,
 };
 
-use self::{api::ApiClient, news::NewsClient, resource::ResourceService};
+use self::{
+    api::ApiClient,
+    news::NewsClient,
+    resource::{ResourceClient, ResourceService},
+};
 
 /// Resource fetch strategy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,47 +83,18 @@ impl FetchState<i32> {
     }
 }
 
-#[derive(Debug)]
-pub enum UpdateEvent {
-    News(News),
-    Announce(Announce),
-    Cartoon(Thumbnail),
-}
-
 // #[derive(Debug)]
 pub struct PriconneService {
     // pub client: reqwest::Client,
     pub database: mongodb::Database,
     pub strategy: FetchStrategy,
     pub post_collection: PostCollection,
-    // pub post_collection: PostCollection,
-    pub handler: Box<dyn Fn(UpdateEvent) + Sync + Send>,
-    // pub announce_service: ResourceService<Announce, ApiClient>,
     pub telegraph: telegraph_rs::Telegraph,
-    pub message_builder: MessageBuilder,
-    pub bot: teloxide::Bot,
-    pub chat_id: Recipient,
-    // pub api: ApiClient,
-    // pub news: NewsClient,
     pub news_service: ResourceService<News, NewsClient>,
     pub information_service: ResourceService<Announce, ApiClient>,
     pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
-}
-
-enum Action {
-    None,
-    UpdateOnly,
-    Edit,
-    Send,
-}
-
-impl Action {
-    pub fn send(&self) -> bool {
-        match self {
-            Action::Send => true,
-            _ => false,
-        }
-    }
+    pub extractor: Extractor,
+    pub chat_manager: ChatManager,
 }
 
 impl PriconneService {
@@ -160,107 +135,42 @@ impl PriconneService {
     //     })
     // }
 
-    // fn client(&self) -> &reqwest::Client {
-    //     &self.client
-    // }
+    pub async fn check_announce(
+        &self,
+        find_result: ResourceFindResult<Announce>,
+        source: Source,
+    ) -> Result<(), Error> {
+        // TODO: sync missed data
+        let resource = find_result.item();
+        let post = self
+            .post_collection
+            .find_resource(resource, &source)
+            .await?;
 
-    // pub fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-    //     self.client().get(url)
-    // }
-
-    // pub async fn handle_new_post(&self, post: PostKind) {
-    //     let source = post.into_source();
-    //     let found_post = self.post_collection.find(&post.title(), source).await.unwrap();
-    //     if let Some(found_post) = found_post {
-    //         found_post.update(post);
-    //         // send it to log
-    //     } else {
-    //         self.post_collection.insert(post);
-    //         // send it to channel
-    //     }
-    // }
-
-    fn need_update_send_announce(&self, announce: &Announce, api_id: &str, post: Post) -> Action {
-        if post.message_id.is_none() {
-            return Action::Send;
+        let action = ActionBuilder::new(&source, &find_result, &post).get_action();
+        if action.is_none() {
+            return Ok(());
         }
 
-        let db_id = match post.source.announce.get(api_id) {
-            Some(db_id) => db_id,
-            None => return Action::UpdateOnly,
-        };
+        // ask client to get full article
+        // maybe other things like thumbnail for cartoon, todo
+        let page = self.information_service.page(resource).await?;
 
-        if *db_id != announce.announce_id {
-            return Action::Edit;
-        }
+        // extract data
+        // TODO: telegraph patch in utils
+        let data = self.extractor.extract_post(&page);
+        let telegraph = self
+            .telegraph
+            .create_page(&data.title, "TODO", false)
+            .await?;
+        let data = data.with_telegraph_url(telegraph.url);
 
-        if announce.replace_time > post.update_time {
-            return Action::Edit;
-        }
+        // generate final message action and execute
+        let post = Post::new(data);
+        self.post_collection.upsert(post);
 
-        Action::None
-    }
-
-    pub async fn send_message(&self) {}
-
-    pub async fn check_announce(&self) -> Result<(), Error> {
-        // Fetch new or updated announces
-        // Currently, these updated announces are not updated in our database
-        let latests = self.information_service.latests().await?;
-
-        // Check in post db
-        for announce in latests.iter() {
-            let post = self
-                .post_collection
-                .find_resource(announce, &self.information_service)
-                .await?;
-
-            // fetch information?
-            // if true, fetch it and upload to telegraph, then update the post
-            let mut fetch_information = false;
-
-            // create a post if it doesn't exist
-            if post.is_none() {
-                // to create a post, we must fetch it first
-                // since "fetch or not" depends on post update not exists, this may then changed to a "intent" like "flag"
-
-                
-                // send post to channel
-                //     let sender = self.message_builder.build_message_announce(
-                //     announce,
-                //     &information,
-                //     api_id.clone(),
-                //     &telegraph,
-                // );
-                // let post = sender.send(self.bot.clone(), self.chat_id.clone()).await?;
-                // self.post_collection.upsert(post).await?;
-            }
-
-            if fetch_information {
-
-                let (information, node) = self
-                    .information_service
-                    .client
-                    .information(announce.announce_id)
-                    .await?;
-
-                // get the telegraph page
-                let telegraph = self
-                    .telegraph
-                    .create_page_doms(&information.title, iter::once(node), false)
-                    .await?;
-            }
-
-            // update the post by fetching it
-            // send message
-            // update db
-        }
-
-        // Send or not
-
-        // Update announce db
-
-        // Update post db
+        // TODO: use action
+        let message = self.chat_manager.send_post(&post).await;
 
         Ok(())
     }

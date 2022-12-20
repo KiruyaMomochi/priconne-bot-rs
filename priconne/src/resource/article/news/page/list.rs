@@ -13,7 +13,7 @@ pub struct NewsList {
 }
 
 impl Page for NewsList {
-    fn from_document(document: NodeRef) -> Result<(Self, NodeRef), Error> {
+    fn from_document(document: NodeRef) -> Result<Self, Error> {
         let pagging_node = document
             .select_first(".paging")
             .map_err(|_| Error::KuchikiError)?;
@@ -32,12 +32,12 @@ impl Page for NewsList {
         let dl_node = dl_node.as_node();
         let result = node_to_news_list(dl_node)?;
 
-        Ok((Self {
+        Ok(Self {
             current_page: page,
             news_list: result,
             next_href: next_page_href,
             prev_href: prev_page_href,
-        }, document))
+        })
     }
 }
 
@@ -56,7 +56,7 @@ fn node_to_news_list(dl_node: &NodeRef) -> Result<Vec<News>, Error> {
 
 fn node_to_next_href(pagging_node: &NodeRef) -> Option<String> {
     let next_page_node = pagging_node.select_first("a[title=下一頁]");
-    
+
     next_page_node.ok().and_then(|last_page_node| {
         last_page_node
             .attributes
@@ -68,7 +68,7 @@ fn node_to_next_href(pagging_node: &NodeRef) -> Option<String> {
 
 fn node_to_prev_href(pagging_node: &NodeRef) -> Option<String> {
     let prev_page_node = pagging_node.select_first("a[title=上一頁]");
-    
+
     prev_page_node.ok().and_then(|first_page_node| {
         first_page_node
             .attributes
@@ -101,20 +101,14 @@ mod tests {
     #[test]
     fn test_from_document() {
         let path = Path::new("tests/news_list.html");
-        let document = kuchiki::parse_html()
-            .from_utf8()
-            .from_file(path)
-            .unwrap();
+        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
 
         let (result, _) = NewsList::from_document(document).unwrap();
         println!("{:#?}", result);
 
         assert_eq!(result.current_page, 1);
         assert_eq!(result.news_list.len(), 10);
-        assert_eq!(
-            result.next_href,
-            Some("news?page=2".to_owned())
-        );
+        assert_eq!(result.next_href, Some("news?page=2".to_owned()));
         assert_eq!(result.prev_href, None);
     }
 }

@@ -1,20 +1,20 @@
 use super::{get_category, get_date};
-use crate::event::{get_events, EventPeriod};
-use chrono::{Date, FixedOffset};
-use kuchiki::{ElementData, NodeDataRef, NodeRef};
+use crate::insight::PostPage;
+use crate::utils::{trim_leading_whitespace, HOUR};
 use crate::{Error, Page};
-use crate::utils::trim_leading_whitespace;
+use chrono::{FixedOffset, NaiveDate};
+use kuchiki::{ElementData, NodeDataRef, NodeRef};
 
 #[derive(Debug)]
 pub struct NewsPage {
     pub title: String,
     pub category: Option<String>,
-    pub date: Date<FixedOffset>,
-    pub events: Vec<EventPeriod>,
+    pub date: NaiveDate,
+    pub content_node: NodeRef,
 }
 
 impl Page for NewsPage {
-    fn from_document(document: NodeRef) -> Result<(Self, kuchiki::NodeRef), Error> {
+    fn from_document(document: NodeRef) -> Result<Self, Error> {
         let news_con_node = document
             .select_first(".news_con")
             .map_err(|_| Error::KuchikiError)?;
@@ -45,18 +45,41 @@ impl Page for NewsPage {
         let section_node = news_con_node
             .select_first("section")
             .map_err(|_| Error::KuchikiError)?;
-        let content = get_content(&section_node)?.clone();
+        let content_node = get_content(&section_node)?.clone();
 
-        let events = get_events(&section_node);
-
-        let news = Self {
+        Ok(Self {
             category,
             date,
             title,
-            events,
-        };
+            content_node,
+        })
+    }
+}
 
-        Ok((news, content))
+pub struct NewsData {
+    pub category: Option<String>,
+}
+
+impl PostPage for NewsPage {
+    type ExtraData = NewsData;
+
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn content(&self) -> kuchiki::NodeRef {
+        self.content_node.clone()
+    }
+
+    fn create_time(&self) -> Option<chrono::DateTime<FixedOffset>> {
+        let offset = FixedOffset::east(8 * HOUR);
+        self.date.and_hms_opt(0, 0, 0)?.and_local_timezone(offset)
+    }
+
+    fn extra(&self) -> Self::ExtraData {
+        Self::ExtraData {
+            category: self.category,
+        }
     }
 }
 
@@ -86,10 +109,10 @@ fn get_content(section_node: &NodeDataRef<ElementData>) -> Result<&NodeRef, Erro
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::HOUR;
     use chrono::TimeZone;
     use kuchiki::traits::TendrilSink;
     use std::path::Path;
-    use crate::utils::HOUR;
 
     #[test]
     fn test_from_document() {

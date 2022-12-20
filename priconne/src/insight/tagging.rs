@@ -23,15 +23,18 @@ impl RegexTagger {
             .map(|(_regex, tag)| tag.to_string())
     }
 
-    pub fn tag_title<'a>(&self, title: &'a str, tags: &mut LinkedHashSet<String>) -> &'a str {
+    pub fn tag_title<'a>(&self, title: &'a str) -> LinkedHashSet<String> {
         let mut title = title;
+        let mut tags = LinkedHashSet::new();
+
         if let Some((category, base_title)) = title.split_prefix('【', '】') {
             title = base_title;
             tags.insert(category.to_string());
         }
     
         tags.extend(self.tag_iter(title));
-        title
+        tags.extend(extract_tag(&title));
+        tags
     }
 }
 

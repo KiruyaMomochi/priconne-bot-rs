@@ -1,17 +1,22 @@
 pub mod article;
-pub mod glossary;
-pub mod same;
-pub mod post;
 pub mod cartoon;
+pub mod glossary;
+pub mod post;
+pub mod same;
+pub mod update;
 
+use crate::utils::HOUR;
 pub use article::*;
-use self::{information::Announce, news::News, cartoon::Thumbnail, post::PostSource};
+use chrono::{DateTime, FixedOffset, Utc};
+
+use self::{cartoon::Thumbnail, information::Announce, news::News};
 
 pub trait Resource {
     type IdType;
     fn id(&self) -> Self::IdType;
     fn title(&self) -> &str;
     fn is_update(&self, other: &Self) -> bool;
+    fn update_time(&self) -> DateTime<Utc>;
 }
 
 impl Resource for Announce {
@@ -25,6 +30,9 @@ impl Resource for Announce {
     }
     fn title(&self) -> &str {
         &self.title.title
+    }
+    fn update_time(&self) -> DateTime<Utc> {
+        self.replace_time
     }
 }
 
@@ -40,6 +48,15 @@ impl Resource for News {
     fn title(&self) -> &str {
         &self.title
     }
+
+    fn update_time(&self) -> DateTime<Utc> {
+        self.date
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(FixedOffset::east_opt(8 * HOUR).unwrap())
+            .unwrap()
+            .with_timezone(&Utc)
+    }
 }
 
 impl Resource for Thumbnail {
@@ -54,6 +71,11 @@ impl Resource for Thumbnail {
     fn title(&self) -> &str {
         &self.title
     }
+
+    fn update_time(&self) -> DateTime<Utc> {
+        // TODO
+        Utc::now()
+    }
 }
 
 impl<T: Resource> Resource for &T {
@@ -66,5 +88,9 @@ impl<T: Resource> Resource for &T {
     }
     fn title(&self) -> &str {
         T::title(self)
+    }
+
+    fn update_time(&self) -> DateTime<Utc> {
+        T::update_time(self)
     }
 }

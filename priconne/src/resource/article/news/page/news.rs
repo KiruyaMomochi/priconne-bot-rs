@@ -7,7 +7,7 @@ use super::{get_category, get_date};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct News {
     #[serde(with = "crate::utils::chrono_date_utc8_as_bson_datetime")]
-    pub date: chrono::Date<chrono::FixedOffset>,
+    pub date: chrono::NaiveDate,
     pub category: Option<String>,
     #[serde(rename = "_id")]
     pub id: i32,
