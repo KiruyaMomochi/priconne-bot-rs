@@ -200,7 +200,7 @@ mod tests {
             .select_first("body")
             .unwrap();
         let document = document.as_node();
-        assert_eq!(trim_leading_whitespace(document.children()), true);
+        assert!(trim_leading_whitespace(document.children()));
         assert_eq!(document.to_string(), "<body><h1>Test</h1></body>");
     }
 
