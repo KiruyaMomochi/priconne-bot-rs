@@ -59,6 +59,6 @@ impl ChatManager {
         M: PostMessage,
     {
         self.send_to::<Recipient, M>(post.message(), self.post_recipient())
-            .await;
+            .await.unwrap();
     }
 }
