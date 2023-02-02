@@ -63,7 +63,7 @@ impl PostCollection {
 
     pub async fn upsert(
         &self,
-        post: Post,
+        post: &Post,
     ) -> Result<mongodb::results::InsertOneResult, mongodb::error::Error> {
         self.posts().insert_one(post, None).await
     }

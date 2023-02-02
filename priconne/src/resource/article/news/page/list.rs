@@ -103,7 +103,7 @@ mod tests {
         let path = Path::new("tests/news_list.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
 
-        let (result, _) = NewsList::from_document(document).unwrap();
+        let result = NewsList::from_document(document).unwrap();
         println!("{:#?}", result);
 
         assert_eq!(result.current_page, 1);

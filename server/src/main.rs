@@ -1,30 +1,29 @@
-use axum::{
-    handler::Handler, Router,
-};
+use axum::{handler::Handler, Router};
 
-use std::{
-    net::{SocketAddr},
-};
+use std::net::SocketAddr;
 use teloxide::{
-    adaptors::AutoSend,
     prelude::{Requester, RequesterExt},
     respond,
-    types::{Message},
-    Bot, utils::command::BotCommands,
+    types::Message,
+    utils::command::BotCommands,
+    Bot, repls::CommandReplExt,
 };
 
 use tracing::Level;
 
 #[derive(Debug, BotCommands, Clone)]
-#[command(rename = "lowercase", description = "These commands are supported:")]
+#[command(
+    rename_rule = "lowercase",
+    description = "These commands are supported:"
+)]
 enum TelegramCommand {
     #[command(description = "display this text.")]
     Help,
-    #[command(description = "get cartoon by id.", parse_with = "split")]
+    #[command(description = "get cartoon by id.")]
     Cartoon { id: i32 },
-    #[command(description = "get news by id.", parse_with = "split")]
+    #[command(description = "get news by id.")]
     News { id: i32 },
-    #[command(description = "get information by id.", parse_with = "split")]
+    #[command(description = "get information by id.")]
     Information { id: i32 },
     #[command(description = "send all cartoons.")]
     CartoonAll,
@@ -50,16 +49,13 @@ async fn main() {
 
     // if we are in Codespace, then build url from enviroment variable
     let webhook_url = match std::env::var("CODESPACE_NAME") {
-        Ok(name) => url::Url::parse(&format!(
-            "https://{}-{}.githubpreview.dev/tghook",
-            name, port
-        )),
+        Ok(name) => url::Url::parse(&format!("https://{name}-{port}.githubpreview.dev/tghook")),
         Err(_) => todo!("Not in Codespace"),
     }
     .unwrap();
 
-    let bot = Bot::new("5407842045:AAE8essS9PeiQThS-5_Jj7HSfIR_sAcHdKM").auto_send();
-    
+    let bot = Bot::new("5407842045:AAE8essS9PeiQThS-5_Jj7HSfIR_sAcHdKM");
+
     // create router
     let (listener, stop_flag, router) =
         teloxide::dispatching::update_listeners::webhooks::axum_to_router(
@@ -77,20 +73,20 @@ async fn main() {
         // Nest teloxide router
         .nest("/", router);
 
+    
     tokio::join!(
         // run the server
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
             .with_graceful_shutdown(stop_flag),
         // run the bot
-        teloxide::commands_repl_with_listener(
-            bot.clone(),
-            |bot: AutoSend<Bot>, msg: Message, cmd: TelegramCommand| async move {
-                bot.send_message(msg.chat.id, format!("{:?}", cmd)).await?;
+        TelegramCommand::repl_with_listener(
+            bot,
+            |bot: Bot, msg: Message, cmd: TelegramCommand| async move {
+                bot.send_message(msg.chat.id, format!("{cmd:?}")).await?;
                 respond(())
             },
-            listener,
-            TelegramCommand::ty()
+            listener
         )
     )
     .0
@@ -120,9 +116,17 @@ mod tests {
     async fn bot_test() {
         let bot = teloxide::Bot::new("1214140516:AAG9sZ4Ex76qZ4f3qnisCyz-Tbwq20V6ei8");
         let update = bot.get_updates().send().await.unwrap()[0].clone();
-        if let UpdateKind::Message(Message {chat: Chat {kind: ChatKind::Private(_chat), ..}, ..}) = update.clone().kind {
+        if let UpdateKind::Message(Message {
+            chat:
+                Chat {
+                    kind: ChatKind::Private(_chat),
+                    ..
+                },
+            ..
+        }) = update.clone().kind
+        {
             let json = serde_json::to_string(&update).unwrap();
-            println!("{}", json);
+            println!("{json}");
         }
     }
 }

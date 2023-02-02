@@ -33,7 +33,7 @@ pub trait PostMessage {
 
 impl ChatManager {
     pub fn post_recipient(&self) -> Recipient {
-        self.post_recipient
+        self.post_recipient.clone()
     }
 
     async fn send_to<C, M>(&self, mut message: Message, chat_id: C) -> Result<Message, RequestError>

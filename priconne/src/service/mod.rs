@@ -14,13 +14,14 @@ use crate::{
     database::PostCollection,
     error::Error,
     insight::{Extractor, PostData},
+    message::ChatManager,
     resource::{
         cartoon::Thumbnail,
         information::Announce,
         news::News,
-        post::{Post, sources::Source},
-        update::{ActionBuilder, ResourceFindResult},
-    }, message::ChatManager,
+        post::{sources::Source, Post},
+        update::{Action, ActionBuilder, ResourceFindResult},
+    },
 };
 
 use self::{
@@ -135,7 +136,8 @@ impl PriconneService {
     //     })
     // }
 
-    pub async fn check_announce(
+    /// Add a new information resource to post collection, extract data and send if needed
+    pub async fn add_information(
         &self,
         find_result: ResourceFindResult<Announce>,
         source: Source,
@@ -159,15 +161,30 @@ impl PriconneService {
         // extract data
         // TODO: telegraph patch in utils
         let data = self.extractor.extract_post(&page);
+
+        // TODO: wrap to somewhere
+        let content = telegraph_rs::dom_to_node(&page.page.content_node).unwrap();
+        let content = serde_json::to_string(&content)?;
         let telegraph = self
             .telegraph
-            .create_page(&data.title, "TODO", false)
+            .create_page(&data.title, &content, false)
             .await?;
         let data = data.with_telegraph_url(telegraph.url);
 
         // generate final message action and execute
-        let post = Post::new(data);
-        self.post_collection.upsert(post);
+        // let post = Post::new(data);
+        let post = match post {
+            Some(mut post) => {
+                post.push(data);
+                post
+            }
+            None => Post::new(data),
+        };
+        self.post_collection.upsert(&post);
+
+        if action.is_update_only() {
+            return Ok(());
+        }
 
         // TODO: use action
         let message = self.chat_manager.send_post(&post).await;

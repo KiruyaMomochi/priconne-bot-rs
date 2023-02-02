@@ -1,3 +1,7 @@
+use std::fmt::Debug;
+
+use tracing::debug;
+
 use super::{
     information::InformationPage,
     post::{sources::Source, Post},
@@ -52,6 +56,7 @@ impl<R: Resource> ResourceFindResult<R> {
 }
 
 /// Use information about a resource to find action to take
+#[derive(Debug)]
 pub struct ActionBuilder<'a, R: Resource> {
     pub source: &'a Source,
     /// Item in database before fetch
@@ -62,22 +67,22 @@ pub struct ActionBuilder<'a, R: Resource> {
 
 /// Action to take
 pub enum Action {
-    /// Do nothing
+    /// Do nothing, just return
     None,
-    /// Update database
+    /// Update post, but do not send or edit message
     UpdateOnly,
-    /// Edit an existing post
+    /// Update post and send message
+    Send,
+    /// Update post and edit message
     Edit,
-    /// Create and send a new post
-    Create,
 }
 
 impl Action {
     pub fn need_full_article(&self) -> bool {
         match self {
-            Action::Edit => true,
-            Action::Create => true,
-            _ => false,
+            Action::None => false,
+            Action::UpdateOnly => false,
+            _ => true,
         }
     }
 
@@ -88,10 +93,18 @@ impl Action {
             false
         }
     }
+
+    pub fn is_update_only(&self) -> bool {
+        if let Action::UpdateOnly = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// TODO: random write, may all wrong
-impl<'a, R: Resource<IdType = i32>> ActionBuilder<'a, R> {
+impl<'a, R: Resource<IdType = i32> + Debug> ActionBuilder<'a, R> {
     pub fn new(
         source: &'a Source,
         resource: &'a ResourceFindResult<R>,
@@ -104,29 +117,43 @@ impl<'a, R: Resource<IdType = i32>> ActionBuilder<'a, R> {
         }
     }
 
+    #[tracing::instrument]
     pub fn get_action(&'a self) -> Action {
         let source = self.source;
-        let resource = self.resource.inner;
+        let resource = &self.resource.inner;
         let post = self.post.as_ref();
 
         if post.is_none() {
-            return Action::Create;
+            debug!("old post is None. creating a new one");
+            return Action::Send;
         }
         let post = post.unwrap();
 
-        let db_id = match post.sources.matches(source) {
-            Some(db_id) => db_id,
-            None => return Action::UpdateOnly,
+        // find resource with same source
+        let same_source = post.data.iter().any(|p| &p.source == source);
+        if !same_source {
+            debug!("old post does not contain current source. update the post without posting");
+            return Action::UpdateOnly;
         };
 
-        if db_id != resource.id() {
+        // find resource with same id
+        let found_resource = post
+            .data
+            .iter()
+            .rev().find(|p| &p.source == source && p.id == resource.id());
+        if found_resource.is_none() {
+            debug!("old post has a different source id. edit the old message");
+            return Action::Edit;
+        }
+        let found_resource = found_resource.unwrap();
+
+        let update_time = found_resource.update_time.or(found_resource.create_time);
+        if update_time.is_some() && resource.update_time() > update_time.unwrap() {
+            debug!("old post has same source, but current one is newer. edit the old message");
             return Action::Edit;
         }
 
-        if resource.update_time() > post.update_time {
-            return Action::Edit;
-        }
-
+        debug!("old post has same source, but current one is newer. edit the old message");
         Action::None
     }
 }

@@ -72,13 +72,13 @@ impl PostPage for NewsPage {
     }
 
     fn create_time(&self) -> Option<chrono::DateTime<FixedOffset>> {
-        let offset = FixedOffset::east(8 * HOUR);
-        self.date.and_hms_opt(0, 0, 0)?.and_local_timezone(offset)
+        let offset = FixedOffset::east_opt(8 * HOUR).unwrap();
+        self.date.and_hms_opt(0, 0, 0)?.and_local_timezone(offset).latest()
     }
 
     fn extra(&self) -> Self::ExtraData {
         Self::ExtraData {
-            category: self.category,
+            category: self.category.clone(),
         }
     }
 }
@@ -118,28 +118,28 @@ mod tests {
     fn test_from_document() {
         let path = Path::new("tests/news_page.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, _) = NewsPage::from_document(document).unwrap();
-        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 8, 24));
+        let page = NewsPage::from_document(document).unwrap();
+        assert_eq!(page.date, NaiveDate::from_ymd_opt(2021, 8, 24).unwrap());
         assert_eq!(page.category, Some("活動".to_owned()));
         assert_eq!(
             page.title,
             "【轉蛋】《精選轉蛋》新角色「克蘿依（聖學祭）」登場！機率UP活動舉辦預告！".to_owned()
         );
-        assert_eq!(page.events.len(), 1);
+        assert_eq!(page.events().len(), 1);
     }
 
     #[test]
     fn test_from_1376() {
         let path = Path::new("tests/news_1376.html");
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
-        let (page, _) = NewsPage::from_document(document).unwrap();
+        let page = NewsPage::from_document(document).unwrap();
 
-        assert_eq!(page.date, FixedOffset::east(HOUR).ymd(2021, 10, 26));
+        assert_eq!(page.date, NaiveDate::from_ymd_opt(2021, 10, 26).unwrap());
         assert_eq!(page.category, Some("活動".to_owned()));
         assert_eq!(
             page.title,
             "【活動】《10月戰隊競賽》限定加碼！特別排名活動".to_owned()
         );
-        assert_eq!(page.events.len(), 1);
+        assert_eq!(page.events().len(), 1);
     }
 }

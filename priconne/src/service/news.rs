@@ -48,6 +48,7 @@ impl NewsClient {
         let html = response.text().await?;
 
         let response = PostPageResponse {
+            post_id: news_id,
             source: Source::News,
             url,
             page: NewsPage::from_html(html)?,

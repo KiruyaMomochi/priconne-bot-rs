@@ -15,7 +15,6 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 teloxide = { workspace = true, features = [
-  "auto-send",
   "macros",
   "webhooks-axum",
 ] }

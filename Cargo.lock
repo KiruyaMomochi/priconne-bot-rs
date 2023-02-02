@@ -200,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.78"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20104e2335ce8a659d6dd92a51a767a0c062599c73b343fd152cb401e828c3d"
+checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
 
 [[package]]
 name = "cfg-if"
@@ -298,7 +298,7 @@ dependencies = [
  "dtoa-short",
  "itoa 0.4.8",
  "matches",
- "phf 0.8.0",
+ "phf",
  "proc-macro2",
  "quote",
  "smallvec",
@@ -317,9 +317,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61a7545f753a88bcbe0a70de1fcc0221e10bfc752f576754fa91e663db1622e"
+checksum = "322296e2f2e5af4270b54df9e85a02ff037e271af20ba3e7fe1575515dc840b8"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -329,9 +329,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f464457d494b5ed6905c63b0c4704842aba319084a0a3561cdc1359536b53200"
+checksum = "017a1385b05d631e7875b1f151c9f012d37b53491e2a87f65bff5c262b2111d8"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -344,15 +344,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43c7119ce3a3701ed81aca8410b9acf6fc399d2629d057b87e2efa4e63a3aaea"
+checksum = "c26bbb078acf09bc1ecda02d4223f03bdd28bd4874edcb0379138efc499ce971"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65e07508b90551e610910fa648a1878991d367064997a596135b86df30daf07e"
+checksum = "357f40d1f06a24b60ae1fe122542c1fb05d28d32acb2aed064e84bc2ad1e252e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -461,9 +461,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
+checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
 name = "encoding_rs"
@@ -749,21 +749,7 @@ checksum = "e5c13fb08e5d4dfc151ee5e88bae63f7773d61852f3bdc73c9f4b9e1bde03148"
 dependencies = [
  "log",
  "mac",
- "markup5ever 0.10.1",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "html5ever"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea68cab48b8459f17cf1c944c67ddc572d272d9f2b274140f223ecb1da4a3b7"
-dependencies = [
- "log",
- "mac",
- "markup5ever 0.11.0",
+ "markup5ever",
  "proc-macro2",
  "quote",
  "syn",
@@ -971,7 +957,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ea8e9c6e031377cff82ee3001dc8026cdf431ed4e2e6b51f98ab8c73484a358"
 dependencies = [
  "cssparser",
- "html5ever 0.25.2",
+ "html5ever",
  "matches",
  "selectors",
 ]
@@ -1054,22 +1040,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a24f40fb03852d1cdd84330cddcaf98e9ec08a7b7768e952fad3b4cf048ec8fd"
 dependencies = [
  "log",
- "phf 0.8.0",
- "phf_codegen 0.8.0",
- "string_cache",
- "string_cache_codegen",
- "tendril",
-]
-
-[[package]]
-name = "markup5ever"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2629bb1404f3d34c2e921f21fd34ba00b206124c81f65c50b43b6aaefeb016"
-dependencies = [
- "log",
- "phf 0.10.1",
- "phf_codegen 0.10.0",
+ "phf",
+ "phf_codegen",
  "string_cache",
  "string_cache_codegen",
  "tendril",
@@ -1399,15 +1371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "phf"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabbf1ead8a5bcbc20f5f8b939ee3f5b0f6f281b6ad3468b84656b658b455259"
-dependencies = [
- "phf_shared 0.10.0",
-]
-
-[[package]]
 name = "phf_codegen"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1415,16 +1378,6 @@ checksum = "cbffee61585b0411840d3ece935cce9cb6321f01c45477d30066498cd5e1a815"
 dependencies = [
  "phf_generator 0.8.0",
  "phf_shared 0.8.0",
-]
-
-[[package]]
-name = "phf_codegen"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
-dependencies = [
- "phf_generator 0.10.0",
- "phf_shared 0.10.0",
 ]
 
 [[package]]
@@ -1538,7 +1491,7 @@ dependencies = [
  "chrono",
  "cron",
  "futures",
- "html5ever 0.26.0",
+ "html5ever",
  "http",
  "kuchiki",
  "linked_hash_set",
@@ -1915,9 +1868,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.8.1"
+version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c4437699b6d34972de58652c68b98cb5b53a4199ab126db8e20ec8ded29a721"
+checksum = "a332be01508d814fed64bf28f798a146d73792121129962fdf335bb3c49a4254"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -1948,8 +1901,8 @@ dependencies = [
  "fxhash",
  "log",
  "matches",
- "phf 0.8.0",
- "phf_codegen 0.8.0",
+ "phf",
+ "phf_codegen",
  "precomputed-hash",
  "servo_arc",
  "smallvec",

@@ -24,7 +24,7 @@ tracing-futures = "0.2"
 
 # Parsing
 kuchiki = "0.8.1"
-html5ever = "0.26.0"
+html5ever = "0.25.1" # Version required by kuchiki
 regex = "1"
 toml = "0.5.8"
 url = "2.2.2"

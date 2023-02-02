@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     insight::{event::EventPeriod, PostData, PostPage},
     service::resource::{ResourceClient, ResourceService},
-    Error,
+    Error, message::{PostMessage, Message},
 };
 use chrono::{DateTime, TimeZone};
 use linked_hash_set::LinkedHashSet;
@@ -56,6 +56,7 @@ pub enum Region {
 }
 
 pub struct PostPageResponse<T> {
+    pub post_id: i32,
     pub source: Source,
     pub url: url::Url,
     pub page: T,
@@ -97,6 +98,13 @@ impl Post {
             data: vec![data],
         }
     }
+
+    pub fn push<E>(&mut self, data: PostData<E>)
+    where
+        E: Serialize + for<'a> Deserialize<'a>,
+        {
+            self.data.push(data.into_bson_extra())
+        }
 }
 
 impl PostData<bson::Bson> {
@@ -157,5 +165,19 @@ impl PostData<bson::Bson> {
 
         let message = format!("{}{}{}", head, event_str, tail);
         message
+    }
+}
+
+impl PostMessage for Post {
+    fn message(&self) -> Message {
+        let data = self.data.last().unwrap();
+        let text = data.build_message();
+
+        Message {
+            post_id: self.id,
+            silent: false,
+            text,
+            results: vec![]
+        }
     }
 }

@@ -54,6 +54,7 @@ impl ApiClient {
         let html = response.text().await?;
 
         let response = PostPageResponse {
+            post_id: announce_id,
             source: Source::Announce(self.api_server.id.clone()),
             url,
             page: InformationPage::from_html(html)?,

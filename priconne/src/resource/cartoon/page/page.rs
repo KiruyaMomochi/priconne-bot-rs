@@ -1,15 +1,14 @@
-
-
 use crate::{Error, Page};
 
 #[derive(Debug)]
 pub struct CartoonPage {
     pub id: String,
     pub image_src: String,
+    pub content: kuchiki::NodeRef,
 }
 
 impl Page for CartoonPage {
-    fn from_document(document: kuchiki::NodeRef) -> Result<(Self, kuchiki::NodeRef), Error> {
+    fn from_document(document: kuchiki::NodeRef) -> Result<Self, Error> {
         let main_cartoon_node = document
             .select_first(".main_cartoon")
             .map_err(|_| Error::KuchikiError)?;
@@ -32,15 +31,19 @@ impl Page for CartoonPage {
             .ok_or(Error::KuchikiError)?
             .to_owned();
 
-        Ok((Self { id: episode, image_src }, main_cartoon_node.as_node().clone()))
+        Ok(Self {
+            id: episode,
+            image_src,
+            content: main_cartoon_node.as_node().clone(),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kuchiki::traits::TendrilSink;
     use crate::Page;
+    use kuchiki::traits::TendrilSink;
 
     #[test]
     fn test_from_document() {
@@ -97,7 +100,7 @@ window.detail_current_pager = 1;
 </html>
         "#);
 
-        let page = CartoonPage::from_document(document).unwrap().0;
+        let page = CartoonPage::from_document(document).unwrap();
 
         assert_eq!(page.id, "254");
         assert_eq!(

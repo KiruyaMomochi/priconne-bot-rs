@@ -51,7 +51,7 @@ impl PostPage for InformationPage {
     type ExtraData = InformationExtra;
 
     fn content(&self) -> kuchiki::NodeRef {
-        self.content_node
+        self.content_node.clone()
     }
 
     fn create_time(&self) -> Option<DateTime<FixedOffset>> {
