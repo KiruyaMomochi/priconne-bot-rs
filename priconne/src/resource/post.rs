@@ -1,25 +1,18 @@
-use std::collections::HashMap;
+
 
 use crate::{
-    insight::{event::EventPeriod, PostData, PostPage},
-    service::resource::{ResourceClient, ResourceService},
-    Error, message::{PostMessage, Message},
+    insight::{PostData, PostPage}, message::{PostMessage, Message},
 };
-use chrono::{DateTime, TimeZone};
-use linked_hash_set::LinkedHashSet;
+
+
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use teloxide::{
-    payloads::SendMessageSetters,
-    requests::{Request, Requester},
-    types::{ParseMode, Recipient},
-};
+
 
 use self::sources::Source;
 
 use super::{
-    information::{Announce, InformationPage},
     same::map_titie,
     Resource,
 };
@@ -154,16 +147,13 @@ impl PostData<bson::Bson> {
             event_str.push('\n');
         }
 
-        let head = format!("{tag}<b>{title}</b>\n", tag = tag_str, title = title);
+        let head = format!("{tag_str}<b>{title}</b>\n");
 
         let tail = format!(
-            "{link}\n{time} <code>#{id}</code>",
-            link = link,
-            time = create_time,
-            id = id
+            "{link}\n{create_time} <code>#{id}</code>"
         );
 
-        let message = format!("{}{}{}", head, event_str, tail);
+        let message = format!("{head}{event_str}{tail}");
         message
     }
 }

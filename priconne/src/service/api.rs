@@ -35,13 +35,12 @@ impl ApiClient {
 
     fn information_href(&self, announce_id: i32) -> String {
         format!(
-            "information/detail/{announce_id}/1/10/1",
-            announce_id = announce_id
+            "information/detail/{announce_id}/1/10/1"
         )
     }
 
     fn ajax_href(&self, offset: i32) -> String {
-        format!("information/ajax_announce?offset={offset}", offset = offset)
+        format!("information/ajax_announce?offset={offset}")
     }
 
     pub async fn get_information(
@@ -154,7 +153,7 @@ impl ApiClient {
     }
 
     fn cartoon_thumbnail_href(num: i32) -> String {
-        format!("cartoon/thumbnail_list/{num}", num = num)
+        format!("cartoon/thumbnail_list/{num}")
     }
 
     fn cartoon_pager_top_href(current_page_id: i32, page_set: i32) -> String {
@@ -163,14 +162,12 @@ impl ApiClient {
 
     fn cartoon_pager_detail_href(current_page_id: i32, page_set: i32) -> String {
         format!(
-            "cartoon/pager/1/{current_page_id}/{page_set}",
-            current_page_id = current_page_id,
-            page_set = page_set
+            "cartoon/pager/1/{current_page_id}/{page_set}"
         )
     }
 
     fn cartoon_detail_href(id: i32) -> String {
-        format!("cartoon/detail/{id}", id = id)
+        format!("cartoon/detail/{id}")
     }
 
     pub async fn thumbnail_list(&self, page: i32) -> Result<ThumbnailList, Error> {
@@ -267,10 +264,10 @@ impl ResourceClient<Thumbnail> for ApiClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::{service::resource::ResourceService, FetchStrategy};
+    
 
-    use super::*;
-    use futures::{stream, StreamExt, TryStreamExt};
+    
+    
 
     // #[tokio::test]
     // async fn test_try_stream_and_then() {

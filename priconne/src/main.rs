@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         built_info::TARGET,
         "Android"
     );
-    println!("ua: {}", ua);
+    println!("ua: {ua}");
 
     let _client = reqwest::Client::builder().user_agent(ua).build()?;
 

@@ -2,25 +2,25 @@ pub mod api;
 pub mod news;
 pub mod resource;
 
-use std::iter;
 
-use async_trait::async_trait;
+
+
 use futures::StreamExt;
 
 use serde::{Deserialize, Serialize};
-use teloxide::{payloads::SendMessageSetters, requests::Requester, types::Recipient};
+
 
 use crate::{
     database::PostCollection,
     error::Error,
-    insight::{Extractor, PostData},
+    insight::{Extractor},
     message::ChatManager,
     resource::{
         cartoon::Thumbnail,
         information::Announce,
         news::News,
         post::{sources::Source, Post},
-        update::{Action, ActionBuilder, ResourceFindResult},
+        update::{ActionBuilder, ResourceFindResult},
     },
 };
 
@@ -187,7 +187,7 @@ impl PriconneService {
         }
 
         // TODO: use action
-        let message = self.chat_manager.send_post(&post).await;
+        self.chat_manager.send_post(&post).await;
 
         Ok(())
     }

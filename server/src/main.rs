@@ -1,8 +1,8 @@
-use axum::{handler::Handler, Router};
+use axum::{Router};
 
 use std::net::SocketAddr;
 use teloxide::{
-    prelude::{Requester, RequesterExt},
+    prelude::{Requester},
     respond,
     types::Message,
     utils::command::BotCommands,

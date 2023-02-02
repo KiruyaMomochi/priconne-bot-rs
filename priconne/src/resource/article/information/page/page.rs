@@ -3,7 +3,7 @@ use kuchiki::{ElementData, NodeDataRef, NodeRef};
 use serde::{Serialize, Deserialize};
 
 use super::Icon;
-use crate::{Error, Page, insight::PostPage, resource::post::sources::Source};
+use crate::{Error, Page, insight::PostPage};
 
 #[derive(Debug)]
 pub struct InformationPage {

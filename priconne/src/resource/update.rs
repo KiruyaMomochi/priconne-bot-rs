@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use tracing::debug;
 
 use super::{
-    information::InformationPage,
     post::{sources::Source, Post},
     Resource,
 };

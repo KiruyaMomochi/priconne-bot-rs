@@ -33,7 +33,7 @@ impl RegexTagger {
         }
     
         tags.extend(self.tag_iter(title));
-        tags.extend(extract_tag(&title));
+        tags.extend(extract_tag(title));
         tags
     }
 }
@@ -87,7 +87,7 @@ pub fn extract_quote(string: &str) -> Vec<(usize, String)> {
     let mut result = Vec::new();
 
     for (current_byte, ch) in string.char_indices() {
-        if end_char == None {
+        if end_char.is_none() {
             for &(start, end) in &QUOTES {
                 if ch == start {
                     // start_idx = idx;

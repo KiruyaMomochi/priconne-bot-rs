@@ -109,8 +109,8 @@ fn get_content(section_node: &NodeDataRef<ElementData>) -> Result<&NodeRef, Erro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::HOUR;
-    use chrono::TimeZone;
+    
+    
     use kuchiki::traits::TendrilSink;
     use std::path::Path;
 

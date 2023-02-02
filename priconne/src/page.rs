@@ -2,7 +2,7 @@ use crate::error::Error;
 
 use async_trait::async_trait;
 use kuchiki::{traits::TendrilSink, NodeRef};
-use reqwest::Url;
+
 
 /// A web page.
 #[async_trait]

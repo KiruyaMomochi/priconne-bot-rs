@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+
 use mongodb::bson;
 
 use teloxide::{
@@ -8,7 +8,7 @@ use teloxide::{
     RequestError,
 };
 
-use crate::resource::post::Post;
+
 
 pub struct ChatManager {
     pub bot: teloxide::Bot,

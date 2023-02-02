@@ -104,7 +104,7 @@ mod tests {
         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
 
         let result = NewsList::from_document(document).unwrap();
-        println!("{:#?}", result);
+        println!("{result:#?}");
 
         assert_eq!(result.current_page, 1);
         assert_eq!(result.news_list.len(), 10);

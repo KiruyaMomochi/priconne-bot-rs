@@ -5,7 +5,6 @@ use html5ever::tendril::TendrilSink;
 use reqwest::{Response, Url};
 
 use crate::{
-    insight::{Extractor, PostPage},
     resource::{
         news::{News, NewsList, NewsPage},
         post::{sources::Source, PostPageResponse},
@@ -34,11 +33,11 @@ impl NewsClient {
     }
 
     fn list_href(&self, page: i32) -> String {
-        format!("news?page={page}", page = page)
+        format!("news?page={page}")
     }
 
     fn href(&self, news_id: i32) -> String {
-        format!("news/newsDetail/{news_id}", news_id = news_id)
+        format!("news/newsDetail/{news_id}")
     }
 
     async fn get(&self, news_id: i32) -> Result<PostPageResponse<NewsPage>, Error> {
@@ -149,7 +148,7 @@ mod tests {
         let service = ResourceService::new(client, strategy, collection);
 
         let news = service.latests().await?;
-        println!("{:?}", news);
+        println!("{news:?}");
 
         Ok(())
     }

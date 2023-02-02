@@ -1,16 +1,16 @@
 use async_trait::async_trait;
 use futures::{
-    future::{self, BoxFuture},
+    future::{self},
     stream::BoxStream,
     StreamExt, TryStreamExt,
 };
 use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    resource::{Resource, update::ResourceFindResult, self},
-    Error, FetchStrategy, insight::PostPage,
+    resource::{Resource, update::ResourceFindResult},
+    Error, FetchStrategy,
 };
 
 /// `ResourceClient` is a client fetching and parsing resources.
