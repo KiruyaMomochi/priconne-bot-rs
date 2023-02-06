@@ -2,7 +2,7 @@
 
 
 
-use priconne::{built_info, api::ApiServer};
+use priconne::{built_info, service::api::ApiServer};
 use reqwest::Url;
 
 #[tokio::main]

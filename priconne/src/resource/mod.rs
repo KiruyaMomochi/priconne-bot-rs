@@ -2,14 +2,13 @@ pub mod article;
 pub mod cartoon;
 pub mod glossary;
 pub mod post;
-pub mod same;
-pub mod update;
 
 use crate::utils::HOUR;
 pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
 
 use self::{cartoon::Thumbnail, information::Announce, news::News};
+use regex::Regex;
 
 pub trait Resource {
     type IdType;
@@ -93,4 +92,9 @@ impl<T: Resource> Resource for &T {
     fn update_time(&self) -> DateTime<Utc> {
         T::update_time(self)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
 }

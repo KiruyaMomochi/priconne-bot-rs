@@ -44,6 +44,7 @@ impl ChatManager {
             .bot
             .send_message(chat_id.clone(), message.text.clone())
             .disable_notification(message.silent)
+            .parse_mode(teloxide::types::ParseMode::Html)
             .send()
             .await?;
         message.results.push(SendResult {

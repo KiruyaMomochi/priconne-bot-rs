@@ -131,12 +131,12 @@ impl ResourceClient<News> for NewsClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::{news::NewsClient, service::resource::ResourceService, FetchStrategy};
+    use crate::service::{resource::ResourceService, news::NewsClient, FetchStrategy};
     use reqwest::Url;
 
     #[tokio::test]
     async fn test_latest_news() -> Result<(), Box<dyn std::error::Error>> {
-        let collection = crate::database::test::init_db().await?.collection("news");
+        let collection = crate::database::tests::init_db().await?.collection("news");
         let client = NewsClient {
             client: reqwest::Client::new(),
             server: Url::parse("http://www.princessconnect.so-net.tw")?,

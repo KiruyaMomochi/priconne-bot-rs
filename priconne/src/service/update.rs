@@ -2,10 +2,10 @@ use std::fmt::Debug;
 
 use tracing::debug;
 
-use super::{
-    post::{sources::Source, Post},
+use crate::{resource::{
+    post::sources::Source,
     Resource,
-};
+}, database::Post};
 
 #[derive(Debug)]
 pub struct ResourceFindResult<R: Resource> {
@@ -116,7 +116,6 @@ impl<'a, R: Resource<IdType = i32> + Debug> ActionBuilder<'a, R> {
         }
     }
 
-    #[tracing::instrument]
     pub fn get_action(&'a self) -> Action {
         let source = self.source;
         let resource = &self.resource.inner;

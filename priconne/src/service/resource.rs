@@ -8,10 +8,9 @@ use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{
-    resource::{Resource, update::ResourceFindResult},
-    Error, FetchStrategy,
-};
+use crate::{Error, resource::Resource};
+
+use super::{FetchStrategy, update::ResourceFindResult};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
@@ -95,7 +94,7 @@ where
     }
 
     /// Fetches resources that are new or updated in the database, as a stream.
-    fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<R>, Error>>
+    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<R>, Error>>
     where
         Self: Sync,
         R: Send + 'stream,

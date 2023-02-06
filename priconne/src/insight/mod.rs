@@ -1,5 +1,7 @@
-pub mod event;
+mod event;
 pub mod tagging;
+
+pub use event::{EventPeriod, get_events};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use linked_hash_set::LinkedHashSet;
@@ -10,15 +12,12 @@ use serde_with::serde_as;
 use crate::resource::post::{sources::Source, PostPageResponse};
 
 use self::{
-    event::{get_events, EventPeriod},
     tagging::RegexTagger,
 };
 
-type Tags = LinkedHashSet<String>;
-
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PostData<E>
+pub struct PostInsight<E>
 {
     pub title: String,
     pub source: Source,
@@ -36,33 +35,6 @@ pub struct PostData<E>
     pub update_time: Option<DateTime<Utc>>,
     pub telegraph_url: Option<String>,
     pub extra: E,
-}
-
-impl<E: Serialize> PostData<E>
-{
-    pub fn into_bson_extra(self) -> PostData<bson::Bson> {
-        PostData {
-            source: self.source,
-            id: self.id,
-            url: self.url,
-            tags: self.tags,
-            events: self.events,
-            title: self.title,
-            create_time: self.create_time,
-            update_time: self.update_time,
-            telegraph_url: None,
-            extra: bson::to_bson(&self.extra).unwrap(),
-        }
-    }
-}
-
-impl<E> PostData<E>
-{
-    pub fn with_telegraph_url(mut self, url: String) -> Self {
-        self.telegraph_url = Some(url);
-        self
-        
-    }
 }
 
 pub struct Extractor {
@@ -88,9 +60,9 @@ impl Extractor {
     pub fn extract_post<P: PostPage>(
         &self,
         response: &PostPageResponse<P>,
-    ) -> PostData<P::ExtraData> {
+    ) -> PostInsight<P::ExtraData> {
         let page = &response.page;
-        PostData::<P::ExtraData> {
+        PostInsight::<P::ExtraData> {
             id: response.post_id,
             url: response.url.clone(),
             source: response.source.clone(),
@@ -104,3 +76,5 @@ impl Extractor {
         }
     }
 }
+
+pub type Tags = LinkedHashSet<String>;

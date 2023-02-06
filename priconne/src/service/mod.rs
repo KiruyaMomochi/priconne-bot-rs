@@ -1,28 +1,31 @@
 pub mod api;
 pub mod news;
 pub mod resource;
+pub mod update;
 
-
-
+use std::fmt::Debug;
 
 use futures::StreamExt;
 
-use serde::{Deserialize, Serialize};
-
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tracing::{debug, trace};
 
 use crate::{
-    database::PostCollection,
+    database::{Post, PostCollection},
     error::Error,
-    insight::{Extractor},
+    insight::{tagging::RegexTagger, Extractor},
     message::ChatManager,
     resource::{
         cartoon::Thumbnail,
         information::Announce,
         news::News,
-        post::{sources::Source, Post},
-        update::{ActionBuilder, ResourceFindResult},
+        post::{sources::Source, PostPageResponse},
+        Resource,
     },
+    utils,
 };
+
+use update::{ActionBuilder, ResourceFindResult};
 
 use self::{
     api::ApiClient,
@@ -43,6 +46,13 @@ impl FetchStrategy {
     pub fn build(&self) -> FetchState<i32> {
         FetchState::new(self.clone())
     }
+}
+
+impl FetchStrategy {
+    pub const DEFAULT: Self = Self {
+        fuse_limit: 5,
+        ignore_id_lt: 0,
+    };
 }
 
 #[derive(Debug, Clone)]
@@ -88,7 +98,6 @@ impl FetchState<i32> {
 pub struct PriconneService {
     // pub client: reqwest::Client,
     pub database: mongodb::Database,
-    pub strategy: FetchStrategy,
     pub post_collection: PostCollection,
     pub telegraph: telegraph_rs::Telegraph,
     pub news_service: ResourceService<News, NewsClient>,
@@ -99,15 +108,49 @@ pub struct PriconneService {
 }
 
 impl PriconneService {
-    // pub fn new<U: IntoUrl>(
-    //     news_server: U,
-    //     api_servers: Vec<ApiServer>,) -> Result<PriconneService, Error> {
-    //     let client = reqwest::Client::builder()
-    //         .user_agent("pcrinfobot-rs/0.0.1alpha Android")
-    //         .build()?;
+    // let client = reqwest::Client::builder()
+    // .user_agent("pcrinfobot-rs/0.0.1alpha Android")
+    // .build()?;
 
-    //     Self::with_client(client, news_server, api_servers)
-    // }
+    pub fn new(
+        database: mongodb::Database,
+        api: ApiClient,
+        news: NewsClient,
+        chat_manager: ChatManager,
+        telegraph: telegraph_rs::Telegraph,
+    ) -> Result<PriconneService, Error> {
+        let post_collection = PostCollection(database.collection("posts"));
+
+        let cartoon_service = ResourceService::new(
+            api.clone(),
+            FetchStrategy::DEFAULT,
+            database.collection("cartoon"),
+        );
+
+        let news_service =
+            ResourceService::new(news, FetchStrategy::DEFAULT, database.collection("news"));
+
+        let information_service = ResourceService::new(
+            api,
+            FetchStrategy::DEFAULT,
+            database.collection("information"),
+        );
+
+        let extractor = Extractor {
+            tagger: RegexTagger { tag_rules: vec![] },
+        };
+
+        Ok(Self {
+            database,
+            cartoon_service,
+            news_service,
+            information_service,
+            post_collection,
+            chat_manager,
+            extractor,
+            telegraph,
+        })
+    }
 
     // pub fn with_proxy<U: IntoUrl>(
     //     news_server: U,
@@ -136,12 +179,52 @@ impl PriconneService {
     //     })
     // }
 
+    pub async fn last_information(&self) {
+        let information = self
+            .information_service
+            .fused_stream()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+        let news = self
+            .news_service
+            .fused_stream()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+
+        self.add_resource(&self.news_service, news, Source::News)
+            .await;
+        self.add_resource(
+            &self.information_service,
+            information,
+            Source::Announce(self.information_service.client.api_server.id),
+        )
+        .await;
+    }
+
     /// Add a new information resource to post collection, extract data and send if needed
-    pub async fn add_information(
+    pub async fn add_resource<R, C, Response>(
         &self,
-        find_result: ResourceFindResult<Announce>,
+        service: &ResourceService<R, C>,
+        find_result: ResourceFindResult<R>,
+        // TODO: I still don't like to pass source explictly, any better way?
         source: Source,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        R: Resource<IdType = i32>
+            + std::fmt::Debug
+            + Sync
+            + Send
+            + Unpin
+            + Serialize
+            + DeserializeOwned,
+        C: ResourceClient<R, Response = PostPageResponse<Response>> + Sync + Send,
+        Response: crate::insight::PostPage,
+        Response::ExtraData: Serialize + DeserializeOwned + Debug,
+    {
         // TODO: sync missed data
         let resource = find_result.item();
         let post = self
@@ -156,20 +239,45 @@ impl PriconneService {
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
-        let page = self.information_service.page(resource).await?;
+        let page = service.page(resource).await?;
 
         // extract data
         // TODO: telegraph patch in utils
-        let data = self.extractor.extract_post(&page);
+        let mut data = self.extractor.extract_post(&page);
 
         // TODO: wrap to somewhere
-        let content = telegraph_rs::dom_to_node(&page.page.content_node).unwrap();
+        let content_node = page.page.content().clone();
+        let attrs = content_node.as_element().unwrap().clone().attributes;
+        trace!("optimizing {attrs:?}");
+        let content_node = utils::optimize_for_telegraph(content_node);
+
+        let mut content = telegraph_rs::doms_to_nodes(content_node.children()).unwrap();
+        if let Ok(data_json) = serde_json::to_string_pretty(&data.extra) {
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "br".to_string(),
+                attrs: None,
+                children: None,
+            }));
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "br".to_string(),
+                attrs: None,
+                children: None,
+            }));
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "code".to_string(),
+                attrs: None,
+                children: Some(vec![telegraph_rs::Node::Text(data_json.to_string())]),
+            }));
+        }
+
         let content = serde_json::to_string(&content)?;
+        // tracing::trace!("{}", content);
         let telegraph = self
             .telegraph
             .create_page(&data.title, &content, false)
             .await?;
-        let data = data.with_telegraph_url(telegraph.url);
+        data.telegraph_url = Some(telegraph.url);
+        trace!("{data:?}");
 
         // generate final message action and execute
         // let post = Post::new(data);
@@ -180,22 +288,144 @@ impl PriconneService {
             }
             None => Post::new(data),
         };
-        self.post_collection.upsert(&post);
+        self.post_collection.upsert(&post).await?;
 
         if action.is_update_only() {
             return Ok(());
         }
 
         // TODO: use action
+        trace!("sending post {post:?}");
         self.chat_manager.send_post(&post).await;
 
         Ok(())
     }
 }
 
-impl FetchStrategy {
-    pub const DEFAULT: Self = Self {
-        fuse_limit: 5,
-        ignore_id_lt: 0,
-    };
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Region {
+    JP,
+    EN,
+    TW,
+    CN,
+    KR,
+    TH,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use reqwest::{NoProxy, Proxy};
+    use tracing::Level;
+    use tracing_subscriber::EnvFilter;
+
+    use crate::{resource::information::AjaxAnnounce, utils::HOUR};
+
+    use super::*;
+
+    async fn init_service() -> PriconneService {
+        let mongo = mongodb::Client::with_uri_str("mongodb://localhost:27017/")
+            .await
+            .unwrap();
+        let database = mongo.database("priconne_test");
+
+        let mut client = reqwest::Client::builder().user_agent("pcrinfobot-rs/0.0.1alpha Android");
+        let proxy = "http://127.0.0.1:2090";
+        // if let Ok(proxy) = std::env::var("ALL_PROXY") {
+        client = client.proxy(
+            Proxy::all(proxy)
+                .unwrap()
+                .no_proxy(NoProxy::from_string("127.0.0.1,localhost")),
+        );
+        // }
+        let client = client.build().unwrap();
+
+        let api = ApiClient {
+            client: client.clone(),
+            api_server: api::ApiServer {
+                id: "PROD1".to_owned(),
+                url: reqwest::Url::parse("https://api-pc.so-net.tw/").unwrap(),
+                name: "美食殿堂".to_owned(),
+            },
+        };
+
+        let chat_manager = ChatManager {
+            bot: teloxide::Bot::with_client(
+                "5407842045:AAE8essS9PeiQThS-5_Jj7HSfIR_sAcHdKM",
+                client.clone(),
+            ),
+            post_recipient: teloxide::types::Recipient::ChannelUsername("@pcrtwstat".to_owned()),
+        };
+
+        let news = NewsClient {
+            client: client.clone(),
+            server: reqwest::Url::parse("http://www.princessconnect.so-net.tw").unwrap(),
+        };
+
+        let telegraph = telegraph_rs::Telegraph::new("公連資訊")
+            .access_token("73a944775a7c0079385a2697964c335c253896ec7a22acb1922886130f63")
+            .client(client)
+            .create()
+            .await
+            .unwrap();
+
+        PriconneService::new(database, api, news, chat_manager, telegraph).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_latest_information() {
+        let service = init_service().await;
+        let result = service
+            .information_service
+            .fused_stream()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+        println!("{result:#?}");
+    }
+
+    #[tokio::test]
+    async fn test_add_information() {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_str("priconne=trace").unwrap())
+            .init();
+
+        let ajax_announce = AjaxAnnounce {
+            announce_id: 2081,
+            language: 1,
+            category: 2,
+            status: 1,
+            platform: 3,
+            slider_flag: 1,
+            replace_time: chrono::DateTime::<chrono::Utc>::from_str("2023-01-31T03:55:00Z").unwrap().timestamp(),
+            from_date: chrono::DateTime::<chrono::Utc>::from_str("2023-01-31T03:55:00Z").unwrap().with_timezone(&chrono::FixedOffset::east_opt(8 * HOUR).unwrap()),
+            to_date: chrono::DateTime::<chrono::Utc>::from_str("2023-02-12T07:59:00Z").unwrap().with_timezone(&chrono::FixedOffset::east_opt(8 * HOUR).unwrap()),
+            priority: 2081,
+            end_date_slider_image: None,
+            link_num: 1,
+            title: crate::resource::information::AnnounceTitle {
+                        title: "【轉蛋】《精選轉蛋》期間限定角色「智（萬聖節）」登場！機率UP活動舉辦預告！".to_owned(),
+                        slider_image: Some(
+                            "https://img-pc.so-net.tw/elements/media/announce/image/6574a1d415a825a20a8ca59a40872563.png".to_owned(),
+                        ),
+                        thumbnail_image: Some(
+                            "https://img-pc.so-net.tw/elements/media/announce/image/e050a44f06047b63f369581e66724361.png".to_owned(),
+                        ),
+                        banner_ribbon: 2,
+                    },
+        };
+        let find_result = ResourceFindResult::from_new(Announce::from(ajax_announce));
+
+        let service = init_service().await;
+        service
+            .add_resource(
+                &service.information_service,
+                find_result,
+                Source::Announce("PROD1".to_string()),
+            )
+            .await
+            .unwrap();
+    }
 }

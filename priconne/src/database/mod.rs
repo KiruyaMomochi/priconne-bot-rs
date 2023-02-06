@@ -1,12 +1,15 @@
+mod post;
+pub use post::Post;
+
 use mongodb::{bson::doc, options::FindOneOptions, Collection};
+use regex::Regex;
 
 use crate::resource::{
-    post::{sources::Source, Post},
-    same::map_titie,
+    post::sources::Source,
     Resource,
 };
 
-pub struct PostCollection(Collection<Post>);
+pub struct PostCollection(pub Collection<Post>);
 
 impl PostCollection {
     pub fn posts(&self) -> Collection<Post> {
@@ -33,27 +36,31 @@ impl PostCollection {
         id: i32,
         source: &Source,
     ) -> Result<Option<Post>, mongodb::error::Error> {
-        // let source: Source = source.into();
-        let mapped = map_titie(title);
+        let mapped = map_title(title);
         let in24hours = chrono::Utc::now() - chrono::Duration::hours(24);
-        let source_field = &format!("source.{}", source.name());
+        // let source_field = &format!("source.{}", source.name());
+        let filter = doc! {
+            "$or": [
+                {
+                    "mapped_title": mapped,
+                    "data.source": {
+                        "$ne": source
+                    },
+                    "update_time": {
+                        "$gte": in24hours
+                    },
+                },
+                {
+                    "data.source": source,
+                    "data.id": id,
+                }
+            ]
+        };
+        tracing::trace!("{filter:?}");
 
         self.posts()
             .find_one(
-                doc! {
-                    "$or": [
-                        {
-                            "mapped_title": mapped,
-                            source_field: {},
-                            "update_time": {
-                                "$gte": in24hours
-                            }
-                        },
-                        {
-                            source_field: id
-                        }
-                    ]
-                },
+                filter,
                 FindOneOptions::builder()
                     .sort(doc! {"update_time": -1})
                     .build(),
@@ -69,12 +76,39 @@ impl PostCollection {
     }
 }
 
+/// Create mapped title that not changeed by square bracket or update information.
+pub fn map_title(title: &str) -> String {
+    let title = title.trim();
+    let regex = Regex::new(r#"^\s*(【.+?】)?\s*(.+?)\s*(\(.+更新\))?\s*$"#).unwrap();
+    let title = regex.replace(title, "$2");
+
+    title.to_string()
+}
+
 #[cfg(test)]
-pub mod test {
+pub mod tests {
+    use super::*;
+
     pub async fn init_db() -> Result<mongodb::Database, mongodb::error::Error> {
         let client =
             mongodb::Client::with_uri_str("mongodb://root:example@localhost:27017").await?;
         let db = client.database("test_only_delete_me");
         db.drop(None).await.map(|()| db)
+    }
+
+    #[test]
+    fn test_map_titie() {
+        assert_eq!(
+            map_title("「消耗體力時」主角EXP獲得量1.5倍活動！"),
+            "「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
+        assert_eq!(
+            map_title("【活動】【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"),
+            "【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
+        assert_eq!(
+            map_title("【活動】「消耗體力時」主角EXP獲得量1.5倍活動！(1/1更新)"),
+            "「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
     }
 }

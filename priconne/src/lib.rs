@@ -1,16 +1,15 @@
 mod error;
 mod page;
-mod service;
 mod utils;
 
 mod database;
 pub mod resource;
 pub mod insight;
 pub mod message;
+pub mod service;
 
 pub use error::Error;
 pub use page::Page;
-pub use service::*;
 
 // Use of a mod or pub mod is not actually necessary.
 pub mod built_info {

@@ -22,6 +22,7 @@ pub struct ApiServer {
     pub name: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct ApiClient {
     pub client: reqwest::Client,
     pub api_server: ApiServer,
