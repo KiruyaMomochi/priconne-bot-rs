@@ -33,7 +33,7 @@ impl ToString for Schedules {
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>()
-            .join("\n")
+            .join(" | ")
     }
 }
 

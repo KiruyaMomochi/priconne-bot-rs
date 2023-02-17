@@ -8,7 +8,7 @@ use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Error, resource::Resource};
+use crate::{Error, resource::ResourceMetadata};
 
 use super::{FetchStrategy, update::ResourceFindResult};
 
@@ -16,7 +16,7 @@ use super::{FetchStrategy, update::ResourceFindResult};
 #[async_trait]
 pub trait ResourceClient<R>
 where
-    R: Resource<IdType = i32> + Sync,
+    R: ResourceMetadata<IdType = i32> + Sync,
 {
     type Response;
     fn try_stream(&self) -> BoxStream<Result<R, Error>>;
@@ -32,7 +32,7 @@ where
 pub struct ResourceService<R, Client>
 where
     Client: ResourceClient<R>,
-    R: Resource<IdType = i32> + Sync,
+    R: ResourceMetadata<IdType = i32> + Sync,
 {
     pub client: Client,
     pub strategy: FetchStrategy,
@@ -43,7 +43,7 @@ where
 impl<R, Client> ResourceClient<R> for ResourceService<R, Client>
 where
     Client: ResourceClient<R> + Sync + Send,
-    R: Resource<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     type Response = Client::Response;
     fn try_stream(&self) -> BoxStream<Result<R, Error>> {
@@ -60,7 +60,7 @@ where
 impl<R, Client> ResourceService<R, Client>
 where
     Client: ResourceClient<R> + Sync + Send,
-    R: Resource<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     async fn updated(&self, item: R) -> Result<ResourceFindResult<R>, Error> {
         let in_db = self.collection.find(&item).await?;
@@ -109,7 +109,7 @@ where
                     update.is_new(),
                     update.is_update()
                 );
-                future::ok(fetch_state.keep_going(update.item().id(), update.is_update()))
+                future::ok(fetch_state.keep_going(update.item(), update.is_update()))
             })
             .try_filter(|update| future::ready(update.is_not_same()));
 
@@ -133,7 +133,7 @@ where
 impl<R, Client> ResourceService<R, Client>
 where
     Client: ResourceClient<R> + Sync + Send,
-    R: Resource<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     pub fn new(client: Client, strategy: FetchStrategy, collection: Collection<R>) -> Self {
         Self {
@@ -143,11 +143,11 @@ where
         }
     }
 }
-pub struct ResourceCollection<R: Resource>(Collection<R>);
+pub struct ResourceCollection<R: ResourceMetadata>(Collection<R>);
 
 impl<R> ResourceCollection<R>
 where
-    R: Resource<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     pub fn new(collection: Collection<R>) -> Self {
         Self(collection)

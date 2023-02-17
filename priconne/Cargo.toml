@@ -7,27 +7,28 @@ version.workspace = true
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
-cron.workspace = true
 futures.workspace = true
-http.workspace = true
 html5ever.workspace = true
+http.workspace = true
 kuchiki.workspace = true
+linked_hash_set.workspace = true
 log.workspace = true
 mongodb.workspace = true
 regex.workspace = true
 reqwest.workspace = true
-serde.workspace = true
 serde_json.workspace = true
+serde_with.workspace = true
+serde_yaml.workspace = true
+serde.workspace = true
 telegraph-rs.workspace = true
 teloxide.workspace = true
 thiserror.workspace = true
+tokio-cron-scheduler.workspace = true
 tokio.workspace = true
-tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
+tracing.workspace = true
 url.workspace = true
-linked_hash_set.workspace = true
-serde_with.workspace = true
 
 [build-dependencies]
 built.workspace = true

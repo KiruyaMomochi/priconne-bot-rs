@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::resource::{
     post::sources::Source,
-    Resource,
+    ResourceMetadata,
 };
 
 pub struct PostCollection(pub Collection<Post>);
@@ -22,7 +22,7 @@ impl PostCollection {
         source: &Source,
     ) -> Result<Option<Post>, mongodb::error::Error>
     where
-        R: Resource<IdType = i32>,
+        R: ResourceMetadata<IdType = i32>,
     {
         self.find(resource.title(), resource.id(), source).await
     }

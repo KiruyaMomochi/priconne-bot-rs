@@ -4,6 +4,7 @@ use crate::utils::{trim_leading_whitespace, HOUR};
 use crate::{Error, Page};
 use chrono::{FixedOffset, NaiveDate};
 use kuchiki::{ElementData, NodeDataRef, NodeRef};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct NewsPage {
@@ -56,6 +57,7 @@ impl Page for NewsPage {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NewsData {
     pub category: Option<String>,
 }

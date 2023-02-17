@@ -1,10 +1,12 @@
 pub mod api;
+pub mod config;
 pub mod news;
 pub mod resource;
 pub mod update;
 
 use std::fmt::Debug;
 
+use chrono::{TimeZone, Utc};
 use futures::StreamExt;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -20,7 +22,7 @@ use crate::{
         information::Announce,
         news::News,
         post::{sources::Source, PostPageResponse},
-        Resource,
+        Resource, ResourceMetadata,
     },
     utils,
 };
@@ -29,6 +31,7 @@ use update::{ActionBuilder, ResourceFindResult};
 
 use self::{
     api::ApiClient,
+    config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
     resource::{ResourceClient, ResourceService},
 };
@@ -37,22 +40,38 @@ use self::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FetchStrategy {
     /// Stop fetch when continuous posted count is greater than this value.
-    pub fuse_limit: i32,
+    pub fuse_limit: Option<i32>,
     /// Minimum post id.
-    pub ignore_id_lt: i32,
+    pub ignore_id_lt: Option<i32>,
+    /// Minimum update time,
+    pub ignore_time_lt: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl FetchStrategy {
     pub fn build(&self) -> FetchState<i32> {
         FetchState::new(self.clone())
     }
+    pub fn override_by(self, rhs: &Self) -> Self {
+        Self {
+            fuse_limit: rhs.fuse_limit.or(self.fuse_limit),
+            ignore_id_lt: rhs.ignore_id_lt.or(self.ignore_id_lt),
+            ignore_time_lt: rhs.ignore_time_lt.or(self.ignore_time_lt),
+        }
+    }
 }
 
 impl FetchStrategy {
     pub const DEFAULT: Self = Self {
-        fuse_limit: 5,
-        ignore_id_lt: 0,
+        fuse_limit: Some(1),
+        ignore_id_lt: None,
+        ignore_time_lt: None,
     };
+}
+
+impl Default for FetchStrategy {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,18 +88,41 @@ impl FetchState<i32> {
         }
     }
 
-    pub fn keep_going(&mut self, id: i32, is_update: bool) -> bool {
+    pub fn keep_going<R: ResourceMetadata<IdType = i32>>(
+        &mut self,
+        resource: &R,
+        is_update: bool,
+    ) -> bool {
+        let id = resource.id();
+        let update_time = resource.update_time();
+
+        let mut keep_going = true;
+        if let Some(ignore_id_lt) = self.strategy.ignore_id_lt {
+            if id < ignore_id_lt {
+                keep_going = false;
+            }
+        }
+        if let Some(ignore_time_lt) = self.strategy.ignore_time_lt {
+            if update_time < ignore_time_lt {
+                keep_going = false;
+            }
+        }
+        if self.strategy.fuse_limit.is_none() {
+            return keep_going;
+        }
+
         if !is_update {
             self.fuse_count += 1;
-        } else if id >= self.strategy.ignore_id_lt {
+        }
+        if keep_going {
             self.fuse_count = 0;
         } else {
             self.fuse_count += 1;
         }
 
-        let result = self.fuse_count < self.strategy.fuse_limit;
+        let result = self.fuse_count < self.strategy.fuse_limit.unwrap_or(0);
         tracing::debug!(
-            "id: {}/{}, fuse: {}/{}",
+            "id: {}/{:?}, fuse: {}/{:?}",
             id,
             self.strategy.ignore_id_lt,
             self.fuse_count,
@@ -90,7 +132,10 @@ impl FetchState<i32> {
     }
 
     pub fn should_fetch(&self) -> bool {
-        self.fuse_count < self.strategy.fuse_limit
+        match self.strategy.fuse_limit {
+            Some(fuse_limit) => self.fuse_count < self.fuse_count,
+            None => true,
+        }
     }
 }
 
@@ -100,9 +145,16 @@ pub struct PriconneService {
     pub database: mongodb::Database,
     pub post_collection: PostCollection,
     pub telegraph: telegraph_rs::Telegraph,
-    pub news_service: ResourceService<News, NewsClient>,
-    pub information_service: ResourceService<Announce, ApiClient>,
-    pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
+    // Alternative implementation:
+    // pub news_service: ResourceService<News, NewsClient>,
+    // pub information_service: ResourceService<Announce, ApiClient>,
+    // pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
+
+    // Build a resource service when needed, instead of building all of them at once.
+    // That requires keep a full strategy list and a resource list, but have a better
+    // generalization.
+    pub client: reqwest::Client,
+    pub config: FetchConfig,
     pub extractor: Extractor,
     pub chat_manager: ChatManager,
 }
@@ -112,44 +164,78 @@ impl PriconneService {
     // .user_agent("pcrinfobot-rs/0.0.1alpha Android")
     // .build()?;
 
-    pub fn new(
-        database: mongodb::Database,
-        api: ApiClient,
-        news: NewsClient,
-        chat_manager: ChatManager,
-        telegraph: telegraph_rs::Telegraph,
-    ) -> Result<PriconneService, Error> {
-        let post_collection = PostCollection(database.collection("posts"));
+    // pub fn new(
+    //     database: mongodb::Database,
+    //     api: ApiClient,
+    //     news: NewsClient,
+    //     chat_manager: ChatManager,
+    //     telegraph: telegraph_rs::Telegraph,
+    // ) -> Result<PriconneService, Error> {
+    //     let post_collection = PostCollection(database.collection("posts"));
 
-        let cartoon_service = ResourceService::new(
-            api.clone(),
-            FetchStrategy::DEFAULT,
-            database.collection("cartoon"),
-        );
+    //     let cartoon_service = ResourceService::new(
+    //         api.clone(),
+    //         FetchStrategy::DEFAULT,
+    //         database.collection("cartoon"),
+    //     );
 
-        let news_service =
-            ResourceService::new(news, FetchStrategy::DEFAULT, database.collection("news"));
+    //     let news_service =
+    //         ResourceService::new(news, FetchStrategy::DEFAULT, database.collection("news"));
 
-        let information_service = ResourceService::new(
-            api,
-            FetchStrategy::DEFAULT,
-            database.collection("information"),
-        );
+    //     let information_service = ResourceService::new(
+    //         api,
+    //         FetchStrategy::DEFAULT,
+    //         database.collection("information"),
+    //     );
 
-        let extractor = Extractor {
-            tagger: RegexTagger { tag_rules: vec![] },
-        };
+    //     let extractor = Extractor {
+    //         tagger: RegexTagger { tag_rules: vec![] },
+    //     };
 
-        Ok(Self {
-            database,
-            cartoon_service,
-            news_service,
-            information_service,
-            post_collection,
-            chat_manager,
-            extractor,
-            telegraph,
-        })
+    //     Ok(Self {
+    //         database,
+    //         cartoon_service,
+    //         news_service,
+    //         information_service,
+    //         post_collection,
+    //         chat_manager,
+    //         extractor,
+    //         telegraph,
+    //     })
+    // }
+    pub fn service(&self, resource: Resource) {
+        let strategy = self.config.strategy.build_for(resource);
+        let collection = self.database.collection(resource.name());
+        let client = self.client.clone();
+
+        // TODO: WTF
+        let b: ResourceService =
+            match resource {
+                Resource::Announce => ResourceService::<Announce, _>::new(
+                    Box::new(ApiClient {
+                        client,
+                        api_server: self.config.server.api[0].clone(),
+                    }),
+                    strategy,
+                    collection,
+                ),
+                Resource::News => ResourceService::<Thumbnail, _>::new(
+                    Box::new(NewsClient {
+                        client,
+                        server: self.config.server.news.clone(),
+                    }),
+                    strategy,
+                    collection,
+                ),
+                Resource::Cartoon => ResourceService::<News, _>::new(
+                    Box::new(ApiClient {
+                        client,
+                        api_server: self.config.server.api[0].clone(),
+                    }),
+                    strategy,
+                    collection,
+                ),
+            };
     }
 
     // pub fn with_proxy<U: IntoUrl>(
@@ -179,32 +265,6 @@ impl PriconneService {
     //     })
     // }
 
-    pub async fn last_information(&self) {
-        let information = self
-            .information_service
-            .fused_stream()
-            .next()
-            .await
-            .unwrap()
-            .unwrap();
-        let news = self
-            .news_service
-            .fused_stream()
-            .next()
-            .await
-            .unwrap()
-            .unwrap();
-
-        self.add_resource(&self.news_service, news, Source::News)
-            .await;
-        self.add_resource(
-            &self.information_service,
-            information,
-            Source::Announce(self.information_service.client.api_server.id),
-        )
-        .await;
-    }
-
     /// Add a new information resource to post collection, extract data and send if needed
     pub async fn add_resource<R, C, Response>(
         &self,
@@ -214,7 +274,7 @@ impl PriconneService {
         source: Source,
     ) -> Result<(), Error>
     where
-        R: Resource<IdType = i32>
+        R: ResourceMetadata<IdType = i32>
             + std::fmt::Debug
             + Sync
             + Send
@@ -427,5 +487,50 @@ mod tests {
             )
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_last_post() {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_str("priconne=trace").unwrap())
+            .init();
+
+        let service = init_service().await;
+
+        let information = service
+            .information_service
+            .fused_stream()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+        let news = service
+            .news_service
+            .fused_stream()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+
+        service
+            .add_resource(&service.news_service, news, Source::News)
+            .await
+            .unwrap();
+        service
+            .add_resource(
+                &service.information_service,
+                information,
+                Source::Announce(service.information_service.client.api_server.id.clone()),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn test_today_post() {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_str("priconne=trace").unwrap())
+            .init();
+
+        let service = init_service().await;
     }
 }

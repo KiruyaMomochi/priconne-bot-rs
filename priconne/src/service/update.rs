@@ -4,11 +4,11 @@ use tracing::debug;
 
 use crate::{resource::{
     post::sources::Source,
-    Resource,
+    ResourceMetadata,
 }, database::Post};
 
 #[derive(Debug)]
-pub struct ResourceFindResult<R: Resource> {
+pub struct ResourceFindResult<R: ResourceMetadata> {
     /// this is new
     inner: R,
     /// this is a update to a existing item
@@ -17,7 +17,7 @@ pub struct ResourceFindResult<R: Resource> {
     is_same: bool,
 }
 
-impl<R: Resource> ResourceFindResult<R> {
+impl<R: ResourceMetadata> ResourceFindResult<R> {
     pub fn from_new(inner: R) -> Self {
         Self {
             inner,
@@ -56,7 +56,7 @@ impl<R: Resource> ResourceFindResult<R> {
 
 /// Use information about a resource to find action to take
 #[derive(Debug)]
-pub struct ActionBuilder<'a, R: Resource> {
+pub struct ActionBuilder<'a, R: ResourceMetadata> {
     pub source: &'a Source,
     /// Item in database before fetch
     pub resource: &'a ResourceFindResult<R>,
@@ -103,7 +103,7 @@ impl Action {
 }
 
 /// TODO: random write, may all wrong
-impl<'a, R: Resource<IdType = i32> + Debug> ActionBuilder<'a, R> {
+impl<'a, R: ResourceMetadata<IdType = i32> + Debug> ActionBuilder<'a, R> {
     pub fn new(
         source: &'a Source,
         resource: &'a ResourceFindResult<R>,

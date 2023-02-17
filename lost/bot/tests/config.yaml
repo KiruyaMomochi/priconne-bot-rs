@@ -41,29 +41,26 @@ telegraph:
   author_url: "http://example.com"
   access_token: "123456"
 
-resources:
+scheduling:
   information:
-    schedules:
-      - "0 1-59/30 7-21 * * *"
-      - "0 57 12 * * *"
-      - "0 1 0-6,22-23 * * *"
-    chat: "@pcrtw"
-    min: 1434
-    limit: 5
-
+    - "0 1-59/30 7-21 * * *"
+    - "0 57 12 * * *"
+    - "0 1 0-6,22-23 * * *"
   cartoon:
-    schedules:
-      - "0 2,4,8,16 16 * * *"
-      - "0 1 7-18 * * *"
-    chat: "@pcrtwcart"
-    min: 269
-    limit: 5
-
+    - "0 2,4,8,16 16 * * *"
+    - "0 1 7-18 * * *"
   news:
-    schedules:
-      - "0 10-59/30 7-21 * * *"
-      - "0 59 12 * * *"
-      - "0 10 0-6,22-23 * * *"
-    chat: "@pcrtw"
-    min: 1332
-    limit: 5
+    - "0 10-59/30 7-21 * * *"
+    - "0 59 12 * * *"
+    - "0 10 0-6,22-23 * * *"
+
+strategy:
+  base:
+    fuse_limit: 5
+    ignore_time_lt: 2023-02-11 00:00:00
+  information: 
+    ignore_time_lt: 1434
+  cartoon:
+    ignore_time_lt: 269
+  news:
+    ignore_time_lt: 1332

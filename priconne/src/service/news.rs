@@ -144,6 +144,7 @@ mod tests {
         let strategy = FetchStrategy {
             fuse_limit: 5,
             ignore_id_lt: 9999,
+            ..Default::default()
         };
         let service = ResourceService::new(client, strategy, collection);
 

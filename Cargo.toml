@@ -1,5 +1,5 @@
 [workspace]
-members = ["priconne", "scheduler", "server"]
+members = ["priconne", "server"]
 
 [workspace.package]
 authors = ["KiruyaMomochi <KiruyaMomochi@users.noreply.github.com>"]
@@ -42,7 +42,7 @@ reqwest = "0.11.4"
 
 telegraph-rs = { git = "https://github.com/KiruyaMomochi/telegraph-rs" }
 teloxide = { version = "0.12.0", features = ["auto-send", "macros"] }
-# teloxide = { git = "https://github.com/KiruyaMomochi/teloxide", branch = "patch-1", features = ["auto-send", "macros"] }
+tokio-cron-scheduler = { git = "https://github.com/KiruyaMomochi/tokio-cron-scheduler", branch = "ext-cron" }
 
 # Misc
 chrono = { version = "0.4.19", default-features = false, features = [

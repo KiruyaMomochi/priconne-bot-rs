@@ -10,15 +10,36 @@ use chrono::{DateTime, FixedOffset, Utc};
 use self::{cartoon::Thumbnail, information::Announce, news::News};
 use regex::Regex;
 
-pub trait Resource {
+pub enum Resource {
+    Announce,
+    News,
+    Cartoon
+}
+
+
+impl Resource {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Resource::Announce => "announce",
+            Resource::News => "news",
+            Resource::Cartoon => "cartoon",
+        }
+    }
+
+}
+
+/// Metadata for a resource
+pub trait ResourceMetadata {
     type IdType;
     fn id(&self) -> Self::IdType;
     fn title(&self) -> &str;
-    fn is_update(&self, other: &Self) -> bool;
     fn update_time(&self) -> DateTime<Utc>;
+
+    // TODO: change to `compare` and return `Ordering` instead
+    fn is_update(&self, other: &Self) -> bool;
 }
 
-impl Resource for Announce {
+impl ResourceMetadata for Announce {
     type IdType = i32;
     fn is_update(&self, other: &Announce) -> bool {
         self.announce_id == other.announce_id
@@ -35,7 +56,7 @@ impl Resource for Announce {
     }
 }
 
-impl Resource for News {
+impl ResourceMetadata for News {
     type IdType = i32;
     fn is_update(&self, other: &Self) -> bool {
         self.id == other.id && (self.title != other.title || self.date > other.date)
@@ -58,7 +79,7 @@ impl Resource for News {
     }
 }
 
-impl Resource for Thumbnail {
+impl ResourceMetadata for Thumbnail {
     type IdType = i32;
     fn is_update(&self, other: &Self) -> bool {
         self.id == other.id && (self.title != other.title || self.episode != other.episode)
@@ -77,7 +98,7 @@ impl Resource for Thumbnail {
     }
 }
 
-impl<T: Resource> Resource for &T {
+impl<T: ResourceMetadata> ResourceMetadata for &T {
     type IdType = T::IdType;
     fn is_update(&self, other: &Self) -> bool {
         T::is_update(self, other)
