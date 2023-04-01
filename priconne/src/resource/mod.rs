@@ -6,6 +6,7 @@ pub mod post;
 use crate::utils::HOUR;
 pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::{cartoon::Thumbnail, information::Announce, news::News};
 use regex::Regex;
@@ -13,9 +14,8 @@ use regex::Regex;
 pub enum Resource {
     Announce,
     News,
-    Cartoon
+    Cartoon,
 }
-
 
 impl Resource {
     pub fn name(&self) -> &'static str {
@@ -25,11 +25,13 @@ impl Resource {
             Resource::Cartoon => "cartoon",
         }
     }
-
 }
 
 /// Metadata for a resource
-pub trait ResourceMetadata {
+pub trait ResourceMetadata
+where
+    Self: std::fmt::Debug + Sync + Send + Unpin + Serialize + DeserializeOwned,
+{
     type IdType;
     fn id(&self) -> Self::IdType;
     fn title(&self) -> &str;
@@ -98,7 +100,10 @@ impl ResourceMetadata for Thumbnail {
     }
 }
 
-impl<T: ResourceMetadata> ResourceMetadata for &T {
+impl<'a, T: ResourceMetadata> ResourceMetadata for &'a T
+where
+    &'a T: for<'de> Deserialize<'de>,
+{
     type IdType = T::IdType;
     fn is_update(&self, other: &Self) -> bool {
         T::is_update(self, other)

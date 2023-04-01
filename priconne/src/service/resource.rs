@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{Error, resource::ResourceMetadata};
 
-use super::{FetchStrategy, update::ResourceFindResult};
+use super::{update::ResourceFindResult, FetchStrategy};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
@@ -29,6 +29,7 @@ where
     //     self.url_by_id(resource.id())
     // }
 }
+
 pub struct ResourceService<R, Client>
 where
     Client: ResourceClient<R>,
@@ -66,9 +67,7 @@ where
         let in_db = self.collection.find(&item).await?;
 
         let update = match in_db {
-            Some(in_db) => {
-                ResourceFindResult::from_found(item, in_db)
-            }
+            Some(in_db) => ResourceFindResult::from_found(item, in_db),
             None => ResourceFindResult::from_new(item),
         };
 

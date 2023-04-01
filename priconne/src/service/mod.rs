@@ -27,13 +27,14 @@ use crate::{
     utils,
 };
 
-use update::{ActionBuilder, ResourceFindResult};
+use update::{Decision, ResourceFindResult};
 
 use self::{
     api::ApiClient,
     config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
     resource::{ResourceClient, ResourceService},
+    update::Decision,
 };
 
 /// Resource fetch strategy.
@@ -160,146 +161,92 @@ pub struct PriconneService {
 }
 
 impl PriconneService {
-    // let client = reqwest::Client::builder()
-    // .user_agent("pcrinfobot-rs/0.0.1alpha Android")
-    // .build()?;
+    pub fn new(
+        database: mongodb::Database,
+        chat_manager: ChatManager,
+        telegraph: telegraph_rs::Telegraph,
+        client: reqwest::Client,
+        config: FetchConfig,
+    ) -> Result<PriconneService, Error> {
+        let post_collection = PostCollection(database.collection("posts"));
 
-    // pub fn new(
-    //     database: mongodb::Database,
-    //     api: ApiClient,
-    //     news: NewsClient,
-    //     chat_manager: ChatManager,
-    //     telegraph: telegraph_rs::Telegraph,
-    // ) -> Result<PriconneService, Error> {
-    //     let post_collection = PostCollection(database.collection("posts"));
+        let extractor = Extractor {
+            tagger: RegexTagger { tag_rules: vec![] },
+        };
 
-    //     let cartoon_service = ResourceService::new(
-    //         api.clone(),
-    //         FetchStrategy::DEFAULT,
-    //         database.collection("cartoon"),
-    //     );
+        Ok(Self {
+            database,
+            post_collection,
+            chat_manager,
+            extractor,
+            telegraph,
+            client,
+            config,
+        })
+    }
 
-    //     let news_service =
-    //         ResourceService::new(news, FetchStrategy::DEFAULT, database.collection("news"));
-
-    //     let information_service = ResourceService::new(
-    //         api,
-    //         FetchStrategy::DEFAULT,
-    //         database.collection("information"),
-    //     );
-
-    //     let extractor = Extractor {
-    //         tagger: RegexTagger { tag_rules: vec![] },
-    //     };
-
-    //     Ok(Self {
-    //         database,
-    //         cartoon_service,
-    //         news_service,
-    //         information_service,
-    //         post_collection,
-    //         chat_manager,
-    //         extractor,
-    //         telegraph,
-    //     })
-    // }
-    pub fn service(&self, resource: Resource) {
+    pub async fn service(&self, resource: Resource) -> Result<(), Error> {
         let strategy = self.config.strategy.build_for(resource);
         let collection = self.database.collection(resource.name());
         let client = self.client.clone();
 
-        // TODO: WTF
-        let b: ResourceService =
-            match resource {
-                Resource::Announce => ResourceService::<Announce, _>::new(
-                    Box::new(ApiClient {
-                        client,
-                        api_server: self.config.server.api[0].clone(),
-                    }),
-                    strategy,
-                    collection,
-                ),
-                Resource::News => ResourceService::<Thumbnail, _>::new(
-                    Box::new(NewsClient {
-                        client,
-                        server: self.config.server.news.clone(),
-                    }),
-                    strategy,
-                    collection,
-                ),
-                Resource::Cartoon => ResourceService::<News, _>::new(
-                    Box::new(ApiClient {
-                        client,
-                        api_server: self.config.server.api[0].clone(),
-                    }),
-                    strategy,
-                    collection,
-                ),
-            };
+        let service = match resource {
+            Resource::Announce => ResourceService::<Announce, _>::new(
+                ApiClient {
+                    client,
+                    api_server: self.config.server.api[0].clone(),
+                },
+                strategy,
+                collection,
+            ),
+            _ => todo!("How?"),
+        };
+        let results = service.latests().await.unwrap();
+        for result in results {
+            let decision = self
+                .decide(result, Source::Announce("_".to_owned()))
+                .await?;
+            self.work(&service.client, decision).await?;
+        }
+
+        Ok(())
     }
 
-    // pub fn with_proxy<U: IntoUrl>(
-    //     news_server: U,
-    //     api_servers: Vec<ApiServer>,
-    //     proxy_scheme: &str,
-    // ) -> Result<PriconneService, Error> {
-    //     let proxy = reqwest::Proxy::all(proxy_scheme)?;
-    //     let client = reqwest::Client::builder()
-    //         .proxy(proxy)
-    //         .user_agent("pcrinfobot-rs/0.0.1alpha Android")
-    //         .build()?;
-
-    //     Self::with_client(client, news_server, api_servers)
-    // }
-
-    // pub fn with_client<U: IntoUrl>(
-    //     client: reqwest::Client,
-    //     news_server: U,
-    //     api_servers: Vec<ApiServer>,
-    // ) -> Result<Self, Error> {
-    //     Ok(Self {
-    //         client,
-    //         api_server: api_servers.get(0).ok_or(Error::NoApiServer)?.clone(),
-    //         api_servers,
-    //         news_server: news_server.into_url()?,
-    //     })
-    // }
-
-    /// Add a new information resource to post collection, extract data and send if needed
-    pub async fn add_resource<R, C, Response>(
+    /// Given a resource, decide what to do
+    async fn decide<R>(
         &self,
-        service: &ResourceService<R, C>,
         find_result: ResourceFindResult<R>,
         // TODO: I still don't like to pass source explictly, any better way?
         source: Source,
-    ) -> Result<(), Error>
+    ) -> Result<Decision<R>, mongodb::error::Error>
     where
-        R: ResourceMetadata<IdType = i32>
-            + std::fmt::Debug
-            + Sync
-            + Send
-            + Unpin
-            + Serialize
-            + DeserializeOwned,
-        C: ResourceClient<R, Response = PostPageResponse<Response>> + Sync + Send,
-        Response: crate::insight::PostPage,
-        Response::ExtraData: Serialize + DeserializeOwned + Debug,
+        R: ResourceMetadata<IdType = i32>,
     {
-        // TODO: sync missed data
         let resource = find_result.item();
         let post = self
             .post_collection
             .find_resource(resource, &source)
             .await?;
 
-        let action = ActionBuilder::new(&source, &find_result, &post).get_action();
-        if action.is_none() {
+        Ok(Decision::new(source, find_result, post))
+    }
+
+    /// Add a new information resource to post collection, extract data and send if needed
+    /// This is the main entry point of the service
+    pub async fn work<R, C, Response>(&self, client: &C, mut desicion: Decision<R>) -> Result<(), Error>
+    where
+        R: ResourceMetadata<IdType = i32>,
+        C: ResourceClient<R, Response = PostPageResponse<Response>> + Sync + Send,
+        Response: crate::insight::PostPage,
+        Response::ExtraData: Serialize + DeserializeOwned + Debug,
+    {
+        let Some(metadata) = desicion.fetch_page_and_continue() else {
             return Ok(());
-        }
+        };
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
-        let page = service.page(resource).await?;
+        let page = client.page(metadata).await?;
 
         // extract data
         // TODO: telegraph patch in utils
@@ -339,24 +286,13 @@ impl PriconneService {
         data.telegraph_url = Some(telegraph.url);
         trace!("{data:?}");
 
-        // generate final message action and execute
-        // let post = Post::new(data);
-        let post = match post {
-            Some(mut post) => {
-                post.push(data);
-                post
-            }
-            None => Post::new(data),
+        if let Some(post) = desicion.update_post(data) {
+            self.post_collection.upsert(&post).await?;
         };
-        self.post_collection.upsert(&post).await?;
 
-        if action.is_update_only() {
-            return Ok(());
-        }
-
-        // TODO: use action
-        trace!("sending post {post:?}");
-        self.chat_manager.send_post(&post).await;
+        if let Some(post) = desicion.send_post_and_continue() {
+            self.chat_manager.send_post(post).await;
+        };
 
         Ok(())
     }
@@ -480,7 +416,7 @@ mod tests {
 
         let service = init_service().await;
         service
-            .add_resource(
+            .work(
                 &service.information_service,
                 find_result,
                 Source::Announce("PROD1".to_string()),
@@ -513,11 +449,11 @@ mod tests {
             .unwrap();
 
         service
-            .add_resource(&service.news_service, news, Source::News)
+            .work(&service.news_service, news, Source::News)
             .await
             .unwrap();
         service
-            .add_resource(
+            .work(
                 &service.information_service,
                 information,
                 Source::Announce(service.information_service.client.api_server.id.clone()),

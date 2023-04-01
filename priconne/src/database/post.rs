@@ -1,7 +1,6 @@
 use chrono::{DateTime, FixedOffset, Utc};
-use linked_hash_set::LinkedHashSet;
 use mongodb::bson;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
 use crate::{
@@ -65,7 +64,7 @@ pub struct Post {
 
 fn post_insight_to_data<E>(insight: PostInsight<E>) -> (PostData<bson::Bson>, Vec<EventPeriod>)
 where
-    E: Serialize + for<'a> Deserialize<'a>,
+    E: Serialize + DeserializeOwned,
 {
     (
         PostData {
@@ -86,7 +85,7 @@ where
 impl Post {
     pub fn new<E>(data: PostInsight<E>) -> Self
     where
-        E: Serialize + for<'a> Deserialize<'a>,
+        E: Serialize + DeserializeOwned,
     {
         let (data, events) = post_insight_to_data(data);
         Self {
@@ -102,7 +101,7 @@ impl Post {
 
     pub fn push<E>(&mut self, data: PostInsight<E>)
     where
-        E: Serialize + for<'a> Deserialize<'a>,
+        E: Serialize + DeserializeOwned,
     {
         let (data, events) = post_insight_to_data(data);
 

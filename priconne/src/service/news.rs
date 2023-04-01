@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt};
+use futures::{stream::BoxStream, StreamExt, TryStreamExt, TryStream, Stream};
 
 use html5ever::tendril::TendrilSink;
 use reqwest::{Response, Url};
@@ -13,6 +13,7 @@ use crate::{
     Error, Page,
 };
 
+#[derive(Debug, Clone)]
 pub struct NewsClient {
     pub client: reqwest::Client,
     pub server: Url,
@@ -63,16 +64,7 @@ impl NewsClient {
         NewsList::from_html(html)
     }
 
-    fn stream(&self) -> BoxStream<News> {
-        let stream = futures::stream::unfold((Some(self.list_href(1)), self), next_news_list);
-
-        let stream =
-            stream.flat_map(|news_list| futures::stream::iter(news_list.news_list.into_iter()));
-
-        Box::pin(stream)
-    }
-
-    fn try_stream(&self) -> BoxStream<Result<News, Error>> {
+    fn try_stream(&self) -> impl Stream<Item = Result<News, Error>> + '_ {
         let stream =
             futures::stream::try_unfold((Some(self.list_href(1)), self), try_next_news_list);
 
@@ -81,21 +73,8 @@ impl NewsClient {
             .map_ok(futures::stream::iter)
             .try_flatten();
 
-        Box::pin(stream)
+        stream
     }
-}
-
-async fn next_news_list(
-    (href, client): (Option<String>, &NewsClient),
-) -> Option<(NewsList, (Option<String>, &NewsClient))> {
-    let href = href?;
-    let response = client.get_raw(&href).await.ok()?;
-    let text = response.text().await.ok()?;
-    let document = kuchiki::parse_html().one(text);
-    let news_list = NewsList::from_document(document).ok()?;
-    let next_href = news_list.next_href.clone();
-
-    Some((news_list, (next_href, client)))
 }
 
 async fn try_next_news_list(
@@ -119,7 +98,7 @@ async fn try_next_news_list(
 impl ResourceClient<News> for NewsClient {
     type Response = PostPageResponse<NewsPage>;
     fn try_stream(&self) -> BoxStream<Result<News, Error>> {
-        self.try_stream()
+        Box::pin(self.try_stream())
     }
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
         self.get(id).await
@@ -142,8 +121,8 @@ mod tests {
             server: Url::parse("http://www.princessconnect.so-net.tw")?,
         };
         let strategy = FetchStrategy {
-            fuse_limit: 5,
-            ignore_id_lt: 9999,
+            fuse_limit: Some(5),
+            ignore_id_lt: Some(9999),
             ..Default::default()
         };
         let service = ResourceService::new(client, strategy, collection);

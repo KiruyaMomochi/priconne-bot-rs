@@ -1,12 +1,9 @@
-use axum::{Router};
+use axum::Router;
 
 use std::net::SocketAddr;
 use teloxide::{
-    prelude::{Requester},
-    respond,
-    types::Message,
-    utils::command::BotCommands,
-    Bot, repls::CommandReplExt,
+    prelude::Requester, repls::CommandReplExt, respond, types::Message,
+    utils::command::BotCommands, Bot,
 };
 
 use tracing::Level;
@@ -35,13 +32,15 @@ enum TelegramCommand {
     Shutdown,
 }
 
-#[tokio::main]
-async fn main() {
+fn init_logging() {
     // initialize tracing
     tracing_subscriber::fmt()
         .with_max_level(Level::DEBUG)
         .init();
+}
 
+#[tokio::main]
+async fn main() {
     // listening on port 3000
     let port = 3000;
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -73,7 +72,6 @@ async fn main() {
         // Nest teloxide router
         .nest("/", router);
 
-    
     tokio::join!(
         // run the server
         axum::Server::bind(&addr)
@@ -84,7 +82,7 @@ async fn main() {
             bot,
             |bot: Bot, msg: Message, cmd: TelegramCommand| async move {
                 bot.send_message(msg.chat.id, format!("{cmd:?}")).await?;
-                respond(())
+                respond(()) 
             },
             listener
         )

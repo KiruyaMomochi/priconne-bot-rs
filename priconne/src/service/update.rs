@@ -1,11 +1,13 @@
 use std::fmt::Debug;
 
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::debug;
 
-use crate::{resource::{
-    post::sources::Source,
-    ResourceMetadata,
-}, database::Post};
+use crate::{
+    database::{Post, PostCollection},
+    insight::PostInsight,
+    resource::{post::sources::Source, ResourceMetadata},
+};
 
 #[derive(Debug)]
 pub struct ResourceFindResult<R: ResourceMetadata> {
@@ -56,16 +58,20 @@ impl<R: ResourceMetadata> ResourceFindResult<R> {
 
 /// Use information about a resource to find action to take
 #[derive(Debug)]
-pub struct ActionBuilder<'a, R: ResourceMetadata> {
-    pub source: &'a Source,
+pub struct Decision<R: ResourceMetadata> {
+    /// Action to take
+    pub action: Action,
+    /// Source of item
+    pub source: Source,
     /// Item in database before fetch
-    pub resource: &'a ResourceFindResult<R>,
+    pub resource: ResourceFindResult<R>,
     /// Post item
-    pub post: &'a Option<Post>,
+    pub post: Option<Post>,
 }
 
 /// Action to take
-pub enum Action {
+#[derive(Debug)]
+enum Action {
     /// Do nothing, just return
     None,
     /// Update post, but do not send or edit message
@@ -76,51 +82,47 @@ pub enum Action {
     Edit,
 }
 
-impl Action {
-    pub fn need_full_article(&self) -> bool {
-        match self {
-            Action::None => false,
-            Action::UpdateOnly => false,
-            _ => true,
+impl<R: ResourceMetadata<IdType = i32> + Debug> Decision<R> {
+    pub fn fetch_page_and_continue(&self) -> Option<&R> {
+        match self.action {
+            Action::None => None,
+            _ => Some(self.resource.item()),
         }
     }
 
-    pub fn is_none(&self) -> bool {
-        if let Action::None = self {
-            true
-        } else {
-            false
-        }
+    pub fn update_post<E>(&mut self, data: PostInsight<E>) -> Option<&Post>
+    where
+        E: Serialize + DeserializeOwned,
+    {
+        self.post = Some(data.push_into(self.post));
+        self.post.as_ref()
     }
 
-    pub fn is_update_only(&self) -> bool {
-        if let Action::UpdateOnly = self {
-            true
-        } else {
-            false
+    pub fn send_post_and_continue(&self) -> Option<&Post> {
+        match self.action {
+            Action::Send => self.post.as_ref(),
+            _ => None,
         }
     }
 }
 
 /// TODO: random write, may all wrong
-impl<'a, R: ResourceMetadata<IdType = i32> + Debug> ActionBuilder<'a, R> {
-    pub fn new(
-        source: &'a Source,
-        resource: &'a ResourceFindResult<R>,
-        post: &'a Option<Post>,
-    ) -> Self {
+impl<R: ResourceMetadata<IdType = i32> + Debug> Decision<R> {
+    pub fn new(source: Source, resource: ResourceFindResult<R>, post: Option<Post>) -> Self {
         Self {
+            action: Self::get_action(&source, &resource, &post),
             source,
             resource,
             post,
         }
     }
 
-    pub fn get_action(&'a self) -> Action {
-        let source = self.source;
-        let resource = &self.resource.inner;
-        let post = self.post.as_ref();
-
+    fn get_action(
+        source: &Source,
+        resource: &ResourceFindResult<R>,
+        post: &Option<Post>,
+    ) -> Action {
+        let resource = resource.item();
         if post.is_none() {
             debug!("old post is None. creating a new one");
             return Action::Send;
@@ -138,7 +140,8 @@ impl<'a, R: ResourceMetadata<IdType = i32> + Debug> ActionBuilder<'a, R> {
         let found_resource = post
             .data
             .iter()
-            .rev().find(|p| &p.source == source && p.id == resource.id());
+            .rev()
+            .find(|p| &p.source == source && p.id == resource.id());
         if found_resource.is_none() {
             debug!("old post has a different source id. edit the old message");
             return Action::Edit;

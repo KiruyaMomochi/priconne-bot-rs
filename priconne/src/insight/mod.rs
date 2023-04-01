@@ -1,24 +1,24 @@
 mod event;
 pub mod tagging;
 
-pub use event::{EventPeriod, get_events};
+pub use event::{get_events, EventPeriod};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use linked_hash_set::LinkedHashSet;
 use mongodb::bson;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
-use crate::resource::post::{sources::Source, PostPageResponse};
-
-use self::{
-    tagging::RegexTagger,
+use crate::{
+    database::Post,
+    resource::post::{sources::Source, PostPageResponse},
 };
+
+use self::tagging::RegexTagger;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PostInsight<E>
-{
+pub struct PostInsight<E> {
     pub title: String,
     pub source: Source,
     pub id: i32,
@@ -35,6 +35,21 @@ pub struct PostInsight<E>
     pub update_time: Option<DateTime<Utc>>,
     pub telegraph_url: Option<String>,
     pub extra: E,
+}
+
+impl<E> PostInsight<E>
+where
+    E: Serialize + DeserializeOwned,
+{
+    pub fn push_into(self, post: Option<Post>) -> Post {
+        match post {
+            Some(mut post) => {
+                post.push(self);
+                post
+            }
+            None => Post::new(self),
+        }
+    }
 }
 
 pub struct Extractor {

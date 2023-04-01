@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt};
+use futures::{stream::BoxStream, StreamExt, TryStreamExt, Stream};
 
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
@@ -80,19 +80,7 @@ impl ApiClient {
         Ok(announce_list)
     }
 
-    pub fn announce_stream(&self) -> BoxStream<Announce> {
-        let stream = futures::stream::unfold((0, self), next_ajax);
-
-        let stream = stream.flat_map(|ajax_announce| {
-            let list = ajax_announce.announce_list;
-            let iter = list.into_iter().map(Announce::from);
-            futures::stream::iter(iter)
-        });
-
-        Box::pin(stream)
-    }
-
-    pub fn announce_try_stream(&self) -> BoxStream<Result<Announce, Error>> {
+    pub fn announce_try_stream(&self) -> impl Stream<Item = Result<Announce, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_ajax);
         let stream = stream
             .map_ok(|ajax_announce| {
@@ -105,25 +93,8 @@ impl ApiClient {
             .map_ok(futures::stream::iter)
             .try_flatten();
 
-        Box::pin(stream)
+        stream
     }
-}
-
-async fn next_ajax(
-    (index, client): (i32, &ApiClient),
-) -> Option<(AjaxAnnounceList, (i32, &ApiClient))> {
-    if index < 0 {
-        return None;
-    }
-
-    let announce = client.ajax_announce_list(index).await.ok()?;
-    let length = if announce.is_over_next_offset {
-        -1
-    } else {
-        announce.length
-    };
-
-    Some((announce, (length, client)))
 }
 
 async fn try_next_ajax(
@@ -207,29 +178,15 @@ impl ApiClient {
         CartoonPage::from_html(html)
     }
 
-    pub fn thumbnail_stream(&self) -> BoxStream<Thumbnail> {
-        let stream = futures::stream::unfold((0, self), next_thumbnails);
-        let stream = stream.flat_map(futures::stream::iter);
-
-        Box::pin(stream)
-    }
-
-    pub fn thumbnail_try_stream(&self) -> BoxStream<Result<Thumbnail, Error>> {
+    pub fn thumbnail_try_stream(&self) -> impl Stream<Item = Result<Thumbnail, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_thumbnails);
         let stream = stream
             .map_ok(|x| x.into_iter().map(Ok))
             .map_ok(futures::stream::iter)
             .try_flatten();
 
-        Box::pin(stream)
+        stream
     }
-}
-
-async fn next_thumbnails(
-    (page, client): (i32, &ApiClient),
-) -> Option<(Vec<Thumbnail>, (i32, &ApiClient))> {
-    let list = client.thumbnail_list(page).await.ok()?;
-    list.0.map(|thumbnails| (thumbnails, (page + 1, client)))
 }
 
 async fn try_next_thumbnails(
@@ -245,7 +202,7 @@ async fn try_next_thumbnails(
 impl ResourceClient<Announce> for ApiClient {
     type Response = PostPageResponse<InformationPage>;
     fn try_stream(&self) -> BoxStream<Result<Announce, Error>> {
-        self.announce_try_stream()
+        Box::pin(self.announce_try_stream())
     }
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
         self.get_information(id).await
@@ -256,7 +213,7 @@ impl ResourceClient<Announce> for ApiClient {
 impl ResourceClient<Thumbnail> for ApiClient {
     type Response = CartoonPage;
     fn try_stream(&self) -> BoxStream<Result<Thumbnail, Error>> {
-        self.thumbnail_try_stream()
+        Box::pin(self.thumbnail_try_stream())
     }
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
         self.cartoon(id).await
@@ -265,11 +222,6 @@ impl ResourceClient<Thumbnail> for ApiClient {
 
 #[cfg(test)]
 mod tests {
-    
-
-    
-    
-
     // #[tokio::test]
     // async fn test_try_stream_and_then() {
     //     let stream = stream::iter(vec![Ok(1), Ok(2), Err(3)]);

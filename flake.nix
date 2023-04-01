@@ -18,6 +18,7 @@
             llvmPackages_latest.llvm
             llvmPackages_latest.bintools
             llvmPackages_latest.lld
+            cargo-outdated
           ];
           buildInputs = with pkgs; [ 
             rustfmt
