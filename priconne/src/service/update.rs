@@ -5,12 +5,12 @@ use tracing::debug;
 
 use crate::{
     database::{Post, PostCollection},
-    insight::PostInsight,
-    resource::{post::sources::Source, ResourceMetadata},
+    insight::AnnouncementInsight,
+    resource::{announcement::sources::AnnouncementSource, ResourceMetadata},
 };
 
 #[derive(Debug)]
-pub struct ResourceFindResult<R: ResourceMetadata> {
+pub struct MetadataFindResult<R: ResourceMetadata> {
     /// this is new
     inner: R,
     /// this is a update to a existing item
@@ -19,7 +19,7 @@ pub struct ResourceFindResult<R: ResourceMetadata> {
     is_same: bool,
 }
 
-impl<R: ResourceMetadata> ResourceFindResult<R> {
+impl<R: ResourceMetadata> MetadataFindResult<R> {
     pub fn from_new(inner: R) -> Self {
         Self {
             inner,
@@ -58,15 +58,15 @@ impl<R: ResourceMetadata> ResourceFindResult<R> {
 
 /// Use information about a resource to find action to take
 #[derive(Debug)]
-pub struct Decision<R: ResourceMetadata> {
+pub struct AnnouncementDecision<R: ResourceMetadata> {
     /// Action to take
     pub action: Action,
     /// Source of item
-    pub source: Source,
+    pub source: AnnouncementSource,
     /// Item in database before fetch
-    pub resource: ResourceFindResult<R>,
+    pub resource: MetadataFindResult<R>,
     /// Post item
-    pub post: Option<Post>,
+    pub announcement: Option<Post>,
 }
 
 /// Action to take
@@ -82,44 +82,44 @@ enum Action {
     Edit,
 }
 
-impl<R: ResourceMetadata<IdType = i32> + Debug> Decision<R> {
-    pub fn fetch_page_and_continue(&self) -> Option<&R> {
+impl<R: ResourceMetadata<IdType = i32> + Debug> AnnouncementDecision<R> {
+    pub fn should_request(&self) -> Option<&R> {
         match self.action {
             Action::None => None,
             _ => Some(self.resource.item()),
         }
     }
 
-    pub fn update_post<E>(&mut self, data: PostInsight<E>) -> Option<&Post>
+    pub fn update_announcement<E>(&mut self, data: AnnouncementInsight<E>) -> Option<&Post>
     where
         E: Serialize + DeserializeOwned,
     {
-        self.post = Some(data.push_into(self.post));
-        self.post.as_ref()
+        self.announcement = Some(data.push_into(self.announcement));
+        self.announcement.as_ref()
     }
 
     pub fn send_post_and_continue(&self) -> Option<&Post> {
         match self.action {
-            Action::Send => self.post.as_ref(),
+            Action::Send => self.announcement.as_ref(),
             _ => None,
         }
     }
 }
 
 /// TODO: random write, may all wrong
-impl<R: ResourceMetadata<IdType = i32> + Debug> Decision<R> {
-    pub fn new(source: Source, resource: ResourceFindResult<R>, post: Option<Post>) -> Self {
+impl<R: ResourceMetadata<IdType = i32> + Debug> AnnouncementDecision<R> {
+    pub fn new(source: AnnouncementSource, find_result: MetadataFindResult<R>, announcement: Option<Post>) -> Self {
         Self {
-            action: Self::get_action(&source, &resource, &post),
+            action: Self::get_action(&source, &find_result, &announcement),
             source,
-            resource,
-            post,
+            resource: find_result,
+            announcement,
         }
     }
 
     fn get_action(
-        source: &Source,
-        resource: &ResourceFindResult<R>,
+        source: &AnnouncementSource,
+        resource: &MetadataFindResult<R>,
         post: &Option<Post>,
     ) -> Action {
         let resource = resource.item();

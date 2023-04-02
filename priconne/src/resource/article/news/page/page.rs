@@ -1,5 +1,5 @@
 use super::{get_category, get_date};
-use crate::insight::PostPage;
+use crate::insight::AnnouncementPage;
 use crate::utils::{trim_leading_whitespace, HOUR};
 use crate::{Error, Page};
 use chrono::{FixedOffset, NaiveDate};
@@ -62,7 +62,7 @@ pub struct NewsData {
     pub category: Option<String>,
 }
 
-impl PostPage for NewsPage {
+impl AnnouncementPage for NewsPage {
     type ExtraData = NewsData;
 
     fn title(&self) -> String {

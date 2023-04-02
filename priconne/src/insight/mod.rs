@@ -1,6 +1,8 @@
 mod event;
 pub mod tagging;
 
+use std::fmt::Debug;
+
 pub use event::{get_events, EventPeriod};
 
 use chrono::{DateTime, FixedOffset, Utc};
@@ -11,16 +13,16 @@ use serde_with::serde_as;
 
 use crate::{
     database::Post,
-    resource::post::{sources::Source, PostPageResponse},
+    resource::announcement::{sources::AnnouncementSource, AnnouncementResponse},
 };
 
 use self::tagging::RegexTagger;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PostInsight<E> {
+pub struct AnnouncementInsight<E> {
     pub title: String,
-    pub source: Source,
+    pub source: AnnouncementSource,
     pub id: i32,
     pub url: url::Url,
     pub tags: Tags,
@@ -37,7 +39,7 @@ pub struct PostInsight<E> {
     pub extra: E,
 }
 
-impl<E> PostInsight<E>
+impl<E> AnnouncementInsight<E>
 where
     E: Serialize + DeserializeOwned,
 {
@@ -56,8 +58,8 @@ pub struct Extractor {
     pub tagger: RegexTagger,
 }
 
-pub trait PostPage {
-    type ExtraData;
+pub trait AnnouncementPage {
+    type ExtraData: Serialize + DeserializeOwned + Debug;
 
     fn title(&self) -> String;
     fn content(&self) -> kuchiki::NodeRef;
@@ -72,12 +74,12 @@ pub trait PostPage {
 }
 
 impl Extractor {
-    pub fn extract_post<P: PostPage>(
+    pub fn extract_announcement<P: AnnouncementPage>(
         &self,
-        response: &PostPageResponse<P>,
-    ) -> PostInsight<P::ExtraData> {
+        response: &AnnouncementResponse<P>,
+    ) -> AnnouncementInsight<P::ExtraData> {
         let page = &response.page;
-        PostInsight::<P::ExtraData> {
+        AnnouncementInsight::<P::ExtraData> {
             id: response.post_id,
             url: response.url.clone(),
             source: response.source.clone(),

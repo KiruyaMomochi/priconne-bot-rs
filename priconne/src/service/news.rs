@@ -7,7 +7,7 @@ use reqwest::{Response, Url};
 use crate::{
     resource::{
         news::{News, NewsList, NewsPage},
-        post::{sources::Source, PostPageResponse},
+        announcement::{sources::AnnouncementSource, AnnouncementResponse},
     },
     service::resource::ResourceClient,
     Error, Page,
@@ -41,15 +41,15 @@ impl NewsClient {
         format!("news/newsDetail/{news_id}")
     }
 
-    async fn get(&self, news_id: i32) -> Result<PostPageResponse<NewsPage>, Error> {
+    async fn get(&self, news_id: i32) -> Result<AnnouncementResponse<NewsPage>, Error> {
         let href = self.href(news_id);
         let response = self.get_raw(&href).await?;
         let url = response.url().clone();
         let html = response.text().await?;
 
-        let response = PostPageResponse {
+        let response = AnnouncementResponse {
             post_id: news_id,
-            source: Source::News,
+            source: AnnouncementSource::Website,
             url,
             page: NewsPage::from_html(html)?,
         };
@@ -96,7 +96,7 @@ async fn try_next_news_list(
 
 #[async_trait]
 impl ResourceClient<News> for NewsClient {
-    type Response = PostPageResponse<NewsPage>;
+    type Response = AnnouncementResponse<NewsPage>;
     fn try_stream(&self) -> BoxStream<Result<News, Error>> {
         Box::pin(self.try_stream())
     }

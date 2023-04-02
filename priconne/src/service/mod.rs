@@ -15,20 +15,20 @@ use tracing::{debug, trace};
 use crate::{
     database::{Post, PostCollection},
     error::Error,
-    insight::{tagging::RegexTagger, Extractor},
+    insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
     message::ChatManager,
     resource::{
+        announcement::{sources::AnnouncementSource, AnnouncementResponse},
         cartoon::Thumbnail,
         information::Announce,
         news::News,
-        post::{sources::Source, PostPageResponse},
-        Resource, ResourceMetadata,
+        Announcement, Resource, ResourceMetadata,
     },
     service::resource::ResourceResponse,
     utils,
 };
 
-use update::{Decision, ResourceFindResult};
+use update::{AnnouncementDecision, MetadataFindResult};
 
 use self::{
     api::ApiClient,
@@ -144,7 +144,7 @@ impl FetchState<i32> {
 pub struct PriconneService {
     // pub client: reqwest::Client,
     pub database: mongodb::Database,
-    pub post_collection: PostCollection,
+    pub announcement_collection: PostCollection,
     pub telegraph: telegraph_rs::Telegraph,
     // Alternative implementation:
     // pub news_service: ResourceService<News, NewsClient>,
@@ -176,7 +176,7 @@ impl PriconneService {
 
         Ok(Self {
             database,
-            post_collection,
+            announcement_collection: post_collection,
             chat_manager,
             extractor,
             telegraph,
@@ -185,58 +185,36 @@ impl PriconneService {
         })
     }
 
-    pub async fn service<R: Resource>(&self, resource: R) -> Result<(), Error> {
-        let strategy = self.config.strategy.build_for(&resource);
-        let collection = self.database.collection(resource.name());
-        let client = self.client.clone();
-
-        let service = resource.build_service(&self);
+    pub async fn service<A: Announcement>(&self, announcement: A) -> Result<(), Error> {
+        let source = announcement.source();
+        let service = announcement.build_service(&self);
         let results = service.latests().await.unwrap();
+        let client: <A as Announcement>::Client = service.client;
+
         for result in results {
-            let decision = self
-                .decide(result, Source::Announce("_".to_owned()))
+            let announcement = self
+                .announcement_collection
+                .find_resource(result.item(), &source)
                 .await?;
-            self.work(&service.client, decision).await?;
+            let decision = AnnouncementDecision::new(source, result, announcement);
+            self.work_announcement(&service.client, decision).await?;
         }
 
         Ok(())
     }
 
-    /// Given a resource, decide what to do
-    async fn decide<R>(
-        &self,
-        find_result: ResourceFindResult<R>,
-        // TODO: I still don't like to pass source explictly, any better way?
-        source: Source,
-    ) -> Result<Decision<R>, mongodb::error::Error>
-    where
-        R: ResourceMetadata<IdType = i32>,
-    {
-        let resource = find_result.item();
-        let post = self
-            .post_collection
-            .find_resource(resource, &source)
-            .await?;
-
-        Ok(Decision::new(source, find_result, post))
-    }
-
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
-    pub async fn work<R, C, Response>(
+    pub async fn work_announcement<R, C, P: AnnouncementPage>(
         &self,
         client: &C,
-        mut desicion: Decision<R>,
+        mut desicion: AnnouncementDecision<R>,
     ) -> Result<(), Error>
     where
         R: ResourceMetadata<IdType = i32>,
-        C: ResourceClient<R, Response = PostPageResponse<Response>> + Sync + Send,
-        Response: crate::insight::PostPage,
-        Response::ExtraData: Serialize + DeserializeOwned + Debug,
+        C: ResourceClient<R, Response = AnnouncementResponse<P>>,
     {
-        let Some(metadata) = desicion.fetch_page_and_continue() else {
-            return Ok(());
-        };
+        let Some(metadata) = desicion.should_request() else {return Ok(());};
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
@@ -244,7 +222,7 @@ impl PriconneService {
 
         // extract data
         // TODO: telegraph patch in utils
-        let mut data = self.extractor.extract_post(&response);
+        let mut data = self.extractor.extract_announcement(&response);
         let extra = serde_json::to_string_pretty(&data.extra)?;
         if let Some(content) = response.telegraph_content(Some(extra))? {
             let telegraph = self
@@ -255,12 +233,12 @@ impl PriconneService {
         }
 
         trace!("{data:?}");
-        if let Some(post) = desicion.update_post(data) {
-            self.post_collection.upsert(&post).await?;
+        if let Some(announcement) = desicion.update_announcement(data) {
+            self.announcement_collection.upsert(&announcement).await?;
         };
 
-        if let Some(post) = desicion.send_post_and_continue() {
-            self.chat_manager.send_post(post).await;
+        if let Some(announcement) = desicion.send_post_and_continue() {
+            self.chat_manager.send_post(announcement).await;
         };
 
         Ok(())
@@ -381,14 +359,14 @@ mod tests {
                         banner_ribbon: 2,
                     },
         };
-        let find_result = ResourceFindResult::from_new(Announce::from(ajax_announce));
+        let find_result = MetadataFindResult::from_new(Announce::from(ajax_announce));
 
         let service = init_service().await;
         service
-            .work(
+            .work_announcement(
                 &service.information_service,
                 find_result,
-                Source::Announce("PROD1".to_string()),
+                AnnouncementSource::Api("PROD1".to_string()),
             )
             .await
             .unwrap();
@@ -418,14 +396,14 @@ mod tests {
             .unwrap();
 
         service
-            .work(&service.news_service, news, Source::News)
+            .work_announcement(&service.news_service, news, AnnouncementSource::Website)
             .await
             .unwrap();
         service
-            .work(
+            .work_announcement(
                 &service.information_service,
                 information,
-                Source::Announce(service.information_service.client.api_server.id.clone()),
+                AnnouncementSource::Api(service.information_service.client.api_server.id.clone()),
             )
             .await
             .unwrap();

@@ -8,9 +8,9 @@ use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{resource::{ResourceMetadata, post::PostPageResponse}, Error};
+use crate::{resource::{ResourceMetadata, announcement::AnnouncementResponse}, Error};
 
-use super::{update::ResourceFindResult, FetchStrategy};
+use super::{update::MetadataFindResult, FetchStrategy};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
@@ -19,7 +19,7 @@ where
     Self: Sync + Send,
     M: ResourceMetadata<IdType = i32>,
 {
-    type Response;
+    type Response: ResourceResponse;
     fn try_stream(&self) -> BoxStream<Result<M, Error>>;
     async fn get_by_id(&self, id: M::IdType) -> Result<Self::Response, Error>;
     async fn fetch(&self, resource: &M) -> Result<Self::Response, Error> {
@@ -65,12 +65,12 @@ where
         }
     }
 
-    async fn updated(&self, item: M) -> Result<ResourceFindResult<M>, Error> {
+    async fn updated(&self, item: M) -> Result<MetadataFindResult<M>, Error> {
         let in_db = self.collection.find(&item).await?;
 
         let update = match in_db {
-            Some(in_db) => ResourceFindResult::from_found(item, in_db),
-            None => ResourceFindResult::from_new(item),
+            Some(in_db) => MetadataFindResult::from_found(item, in_db),
+            None => MetadataFindResult::from_new(item),
         };
 
         Ok(update)
@@ -81,7 +81,7 @@ where
     }
 
     /// Fetches all resources and their state in the database, as a stream.
-    fn compared_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<M>, Error>>
+    fn compared_stream<'stream>(&'stream self) -> BoxStream<Result<MetadataFindResult<M>, Error>>
     where
         Self: Sync,
         M: 'stream,
@@ -95,7 +95,7 @@ where
     }
 
     /// Fetches resources that are new or updated in the database, as a stream.
-    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<M>, Error>>
+    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<MetadataFindResult<M>, Error>>
     where
         Self: Sync,
         M: Send + 'stream,
@@ -118,7 +118,7 @@ where
     }
 
     /// Fetches resources that are new or updated in the database, as a vector.
-    pub async fn latests(&self) -> Result<Vec<ResourceFindResult<M>>, Error>
+    pub async fn latests(&self) -> Result<Vec<MetadataFindResult<M>>, Error>
     where
         M: Send,
     {
@@ -165,8 +165,11 @@ where
 }
 
 pub trait ResourceResponse {
-    fn title(&self) -> String;
     fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
         Ok(None)
     }
+}
+
+impl ResourceResponse for crate::resource::cartoon::CartoonPage {
+
 }

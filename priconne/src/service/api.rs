@@ -8,7 +8,7 @@ use crate::{
     resource::{
         cartoon::{CartoonPage, PagerDetail, PagerTop, Thumbnail, ThumbnailList},
         information::{AjaxAnnounceList, Announce, InformationPage},
-        post::{sources::Source, PostPageResponse},
+        announcement::{sources::AnnouncementSource, AnnouncementResponse},
     },
     Error, Page,
 };
@@ -47,15 +47,15 @@ impl ApiClient {
     pub async fn get_information(
         &self,
         announce_id: i32,
-    ) -> Result<PostPageResponse<InformationPage>, Error> {
+    ) -> Result<AnnouncementResponse<InformationPage>, Error> {
         let href = self.information_href(announce_id);
         let response = self.get_information_raw(&href).await?;
         let url = response.url().clone();
         let html = response.text().await?;
 
-        let response = PostPageResponse {
+        let response = AnnouncementResponse {
             post_id: announce_id,
-            source: Source::Announce(self.api_server.id.clone()),
+            source: AnnouncementSource::Api(self.api_server.id.clone()),
             url,
             page: InformationPage::from_html(html)?,
         };
@@ -200,7 +200,7 @@ async fn try_next_thumbnails(
 
 #[async_trait]
 impl ResourceClient<Announce> for ApiClient {
-    type Response = PostPageResponse<InformationPage>;
+    type Response = AnnouncementResponse<InformationPage>;
     fn try_stream(&self) -> BoxStream<Result<Announce, Error>> {
         Box::pin(self.announce_try_stream())
     }

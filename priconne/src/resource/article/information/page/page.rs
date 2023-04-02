@@ -3,7 +3,7 @@ use kuchiki::{ElementData, NodeDataRef, NodeRef};
 use serde::{Serialize, Deserialize};
 
 use super::Icon;
-use crate::{Error, Page, insight::PostPage};
+use crate::{Error, Page, insight::AnnouncementPage};
 
 #[derive(Debug)]
 pub struct InformationPage {
@@ -47,7 +47,7 @@ impl Page for InformationPage {
     }
 }
 
-impl PostPage for InformationPage {
+impl AnnouncementPage for InformationPage {
     type ExtraData = InformationExtra;
 
     fn content(&self) -> kuchiki::NodeRef {

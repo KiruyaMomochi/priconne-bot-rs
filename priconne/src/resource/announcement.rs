@@ -1,5 +1,5 @@
 use crate::{
-    insight::{PostInsight, PostPage},
+    insight::{AnnouncementInsight, AnnouncementPage},
     message::{Message, PostMessage},
     service::resource::ResourceResponse,
 };
@@ -8,7 +8,7 @@ use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-use self::sources::Source;
+use self::sources::AnnouncementSource;
 
 pub mod sources {
     use super::*;
@@ -17,45 +17,41 @@ pub mod sources {
     // also change convert::From impl
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(rename_all = "lowercase")]
-    pub enum Source {
-        Announce(String),
-        News,
+    pub enum AnnouncementSource {
+        Api(String),
+        Website,
     }
 
-    impl Source {
+    impl AnnouncementSource {
         pub fn name(&self) -> String {
             match self {
-                Source::Announce(id) => "announce".to_string(),
-                Source::News => "news".to_string(),
+                AnnouncementSource::Api(id) => "announce".to_string(),
+                AnnouncementSource::Website => "news".to_string(),
             }
         }
     }
 
-    impl std::convert::From<Source> for mongodb::bson::Bson {
-        fn from(value: Source) -> Self {
+    impl std::convert::From<AnnouncementSource> for mongodb::bson::Bson {
+        fn from(value: AnnouncementSource) -> Self {
             match value {
-                Source::Announce(id) => bson::bson!({{"announce"}: id}),
-                Source::News => bson::bson!("news"),
+                AnnouncementSource::Api(id) => bson::bson!({{"announce"}: id}),
+                AnnouncementSource::Website => bson::bson!("news"),
             }
         }
     }
 }
 
-pub struct PostPageResponse<T> {
+pub struct AnnouncementResponse<T: AnnouncementPage> {
     pub post_id: i32,
-    pub source: Source,
+    pub source: AnnouncementSource,
     pub url: url::Url,
     pub page: T,
 }
 
-impl<T> ResourceResponse for PostPageResponse<T>
+impl<T> ResourceResponse for AnnouncementResponse<T>
 where
-    T: crate::insight::PostPage,
+    T: crate::insight::AnnouncementPage,
 {
-    fn title(&self) -> String {
-        self.page.title()
-    }
-
     fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
         let content_node = self.page.content();
 

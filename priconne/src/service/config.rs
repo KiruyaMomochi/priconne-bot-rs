@@ -211,7 +211,7 @@ impl PriconneConfig {
         };
 
         return Ok(PriconneService {
-            post_collection: PostCollection(database.collection("posts")),
+            announcement_collection: PostCollection(database.collection("posts")),
             database,
             telegraph,
             client,

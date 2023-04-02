@@ -5,7 +5,7 @@ use mongodb::{bson::doc, options::FindOneOptions, Collection};
 use regex::Regex;
 
 use crate::resource::{
-    post::sources::Source,
+    announcement::sources::AnnouncementSource,
     ResourceMetadata,
 };
 
@@ -19,7 +19,7 @@ impl PostCollection {
     pub async fn find_resource<R>(
         &self,
         resource: &R,
-        source: &Source,
+        source: &AnnouncementSource,
     ) -> Result<Option<Post>, mongodb::error::Error>
     where
         R: ResourceMetadata<IdType = i32>,
@@ -34,7 +34,7 @@ impl PostCollection {
         &self,
         title: &str,
         id: i32,
-        source: &Source,
+        source: &AnnouncementSource,
     ) -> Result<Option<Post>, mongodb::error::Error> {
         let mapped = map_title(title);
         let in24hours = chrono::Utc::now() - chrono::Duration::hours(24);

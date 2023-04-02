@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
 use crate::{
-    insight::{EventPeriod, PostInsight, Tags},
+    insight::{EventPeriod, AnnouncementInsight, Tags},
     message::PostMessage,
-    resource::post::{sources::Source, PostPageResponse, self},
+    resource::announcement::{sources::AnnouncementSource, AnnouncementResponse, self},
     service::Region,
 };
 
@@ -14,7 +14,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct PostData<E> {
     pub title: String,
-    pub source: Source,
+    pub source: AnnouncementSource,
     pub id: i32,
     pub url: url::Url,
     pub tags: Tags,
@@ -62,7 +62,7 @@ pub struct Post {
     pub data: Vec<PostData<bson::Bson>>,
 }
 
-fn post_insight_to_data<E>(insight: PostInsight<E>) -> (PostData<bson::Bson>, Vec<EventPeriod>)
+fn post_insight_to_data<E>(insight: AnnouncementInsight<E>) -> (PostData<bson::Bson>, Vec<EventPeriod>)
 where
     E: Serialize + DeserializeOwned,
 {
@@ -83,7 +83,7 @@ where
 }
 
 impl Post {
-    pub fn new<E>(data: PostInsight<E>) -> Self
+    pub fn new<E>(data: AnnouncementInsight<E>) -> Self
     where
         E: Serialize + DeserializeOwned,
     {
@@ -99,7 +99,7 @@ impl Post {
         }
     }
 
-    pub fn push<E>(&mut self, data: PostInsight<E>)
+    pub fn push<E>(&mut self, data: AnnouncementInsight<E>)
     where
         E: Serialize + DeserializeOwned,
     {

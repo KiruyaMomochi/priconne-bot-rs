@@ -1,9 +1,10 @@
+pub mod announcement;
 pub mod article;
 pub mod cartoon;
 pub mod glossary;
-pub mod post;
 
 use crate::{
+    insight::AnnouncementPage,
     service::{
         resource::{ResourceClient, ResourceService},
         PriconneService,
@@ -14,7 +15,12 @@ pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use self::{cartoon::Thumbnail, information::Announce, news::News};
+use self::{
+    announcement::{sources::AnnouncementSource, AnnouncementResponse},
+    cartoon::Thumbnail,
+    information::Announce,
+    news::News,
+};
 use regex::Regex;
 
 // pub enum Resource {
@@ -45,6 +51,14 @@ pub trait Resource {
     fn collection_name(&self) -> &'static str {
         self.name()
     }
+}
+
+pub trait Announcement: Resource
+where Self::Client: ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>,
+{
+    // type Client: ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>;
+    type Page: AnnouncementPage;
+    fn source(&self) -> AnnouncementSource;
 }
 
 /// Metadata for a resource
