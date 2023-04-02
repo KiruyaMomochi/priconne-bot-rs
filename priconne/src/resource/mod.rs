@@ -3,7 +3,13 @@ pub mod cartoon;
 pub mod glossary;
 pub mod post;
 
-use crate::utils::HOUR;
+use crate::{
+    service::{
+        resource::{ResourceClient, ResourceService},
+        PriconneService,
+    },
+    utils::HOUR,
+};
 pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -11,19 +17,33 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use self::{cartoon::Thumbnail, information::Announce, news::News};
 use regex::Regex;
 
-pub enum Resource {
-    Announce,
-    News,
-    Cartoon,
-}
+// pub enum Resource {
+//     Announce,
+//     News,
+//     Cartoon,
+// }
 
-impl Resource {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Resource::Announce => "announce",
-            Resource::News => "news",
-            Resource::Cartoon => "cartoon",
-        }
+// impl Resource {
+//     pub fn name(&self) -> &'static str {
+//         match self {
+//             Resource::Announce => "announce",
+//             Resource::News => "news",
+//             Resource::Cartoon => "cartoon",
+//         }
+//     }
+// }
+
+pub trait Resource {
+    type Metadata: ResourceMetadata<IdType = i32> + Sync;
+    type Client: ResourceClient<Self::Metadata> + Sync + Send;
+
+    fn name(&self) -> &'static str;
+    fn build_service(
+        &self,
+        priconne: &PriconneService,
+    ) -> ResourceService<Self::Metadata, Self::Client>;
+    fn collection_name(&self) -> &'static str {
+        self.name()
     }
 }
 

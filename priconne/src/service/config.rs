@@ -188,7 +188,7 @@ impl TelegramConfig {
 }
 
 impl StrategyConfig {
-    pub fn build_for(&self, resource: Resource) -> FetchStrategy {
+    pub fn build_for<R: Resource>(&self, resource: &R) -> FetchStrategy {
         let name = resource.name().clone();
         let mut result = self.base.clone();
         if let Some(over) = self.overrides.get(name.clone()) {

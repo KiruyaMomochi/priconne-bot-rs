@@ -1,6 +1,7 @@
 use crate::{
     insight::{PostInsight, PostPage},
     message::{Message, PostMessage},
+    service::resource::ResourceResponse,
 };
 
 use mongodb::bson;
@@ -45,4 +46,44 @@ pub struct PostPageResponse<T> {
     pub source: Source,
     pub url: url::Url,
     pub page: T,
+}
+
+impl<T> ResourceResponse for PostPageResponse<T>
+where
+    T: crate::insight::PostPage,
+{
+    fn title(&self) -> String {
+        self.page.title()
+    }
+
+    fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
+        let content_node = self.page.content();
+
+        let attrs = content_node.as_element().unwrap().clone().attributes;
+        tracing::trace!("optimizing {attrs:?}");
+        let content_node = crate::utils::optimize_for_telegraph(content_node);
+
+        let mut content = telegraph_rs::doms_to_nodes(content_node.children()).unwrap();
+        if let Some(data_json) = extra {
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "br".to_string(),
+                attrs: None,
+                children: None,
+            }));
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "br".to_string(),
+                attrs: None,
+                children: None,
+            }));
+            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
+                tag: "code".to_string(),
+                attrs: None,
+                children: Some(vec![telegraph_rs::Node::Text(data_json.to_string())]),
+            }));
+        }
+
+        let content = serde_json::to_string(&content)?;
+
+        Ok(Some(content))
+    }
 }

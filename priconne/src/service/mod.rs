@@ -24,6 +24,7 @@ use crate::{
         post::{sources::Source, PostPageResponse},
         Resource, ResourceMetadata,
     },
+    service::resource::ResourceResponse,
     utils,
 };
 
@@ -34,7 +35,6 @@ use self::{
     config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
     resource::{ResourceClient, ResourceService},
-    update::Decision,
 };
 
 /// Resource fetch strategy.
@@ -185,22 +185,12 @@ impl PriconneService {
         })
     }
 
-    pub async fn service(&self, resource: Resource) -> Result<(), Error> {
-        let strategy = self.config.strategy.build_for(resource);
+    pub async fn service<R: Resource>(&self, resource: R) -> Result<(), Error> {
+        let strategy = self.config.strategy.build_for(&resource);
         let collection = self.database.collection(resource.name());
         let client = self.client.clone();
 
-        let service = match resource {
-            Resource::Announce => ResourceService::<Announce, _>::new(
-                ApiClient {
-                    client,
-                    api_server: self.config.server.api[0].clone(),
-                },
-                strategy,
-                collection,
-            ),
-            _ => todo!("How?"),
-        };
+        let service = resource.build_service(&self);
         let results = service.latests().await.unwrap();
         for result in results {
             let decision = self
@@ -233,7 +223,11 @@ impl PriconneService {
 
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
-    pub async fn work<R, C, Response>(&self, client: &C, mut desicion: Decision<R>) -> Result<(), Error>
+    pub async fn work<R, C, Response>(
+        &self,
+        client: &C,
+        mut desicion: Decision<R>,
+    ) -> Result<(), Error>
     where
         R: ResourceMetadata<IdType = i32>,
         C: ResourceClient<R, Response = PostPageResponse<Response>> + Sync + Send,
@@ -246,46 +240,21 @@ impl PriconneService {
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
-        let page = client.page(metadata).await?;
+        let response = client.fetch(metadata).await?;
 
         // extract data
         // TODO: telegraph patch in utils
-        let mut data = self.extractor.extract_post(&page);
-
-        // TODO: wrap to somewhere
-        let content_node = page.page.content().clone();
-        let attrs = content_node.as_element().unwrap().clone().attributes;
-        trace!("optimizing {attrs:?}");
-        let content_node = utils::optimize_for_telegraph(content_node);
-
-        let mut content = telegraph_rs::doms_to_nodes(content_node.children()).unwrap();
-        if let Ok(data_json) = serde_json::to_string_pretty(&data.extra) {
-            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
-                tag: "br".to_string(),
-                attrs: None,
-                children: None,
-            }));
-            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
-                tag: "br".to_string(),
-                attrs: None,
-                children: None,
-            }));
-            content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
-                tag: "code".to_string(),
-                attrs: None,
-                children: Some(vec![telegraph_rs::Node::Text(data_json.to_string())]),
-            }));
+        let mut data = self.extractor.extract_post(&response);
+        let extra = serde_json::to_string_pretty(&data.extra)?;
+        if let Some(content) = response.telegraph_content(Some(extra))? {
+            let telegraph = self
+                .telegraph
+                .create_page(&data.title, &content, false)
+                .await?;
+            data.telegraph_url = Some(telegraph.url);
         }
 
-        let content = serde_json::to_string(&content)?;
-        // tracing::trace!("{}", content);
-        let telegraph = self
-            .telegraph
-            .create_page(&data.title, &content, false)
-            .await?;
-        data.telegraph_url = Some(telegraph.url);
         trace!("{data:?}");
-
         if let Some(post) = desicion.update_post(data) {
             self.post_collection.upsert(&post).await?;
         };

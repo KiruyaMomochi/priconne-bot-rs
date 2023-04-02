@@ -8,62 +8,64 @@ use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Error, resource::ResourceMetadata};
+use crate::{resource::{ResourceMetadata, post::PostPageResponse}, Error};
 
 use super::{update::ResourceFindResult, FetchStrategy};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
-pub trait ResourceClient<R>
+pub trait ResourceClient<M>
 where
-    R: ResourceMetadata<IdType = i32> + Sync,
+    Self: Sync + Send,
+    M: ResourceMetadata<IdType = i32>,
 {
     type Response;
-    fn try_stream(&self) -> BoxStream<Result<R, Error>>;
-    async fn get_by_id(&self, id: R::IdType) -> Result<Self::Response, Error>;
-    async fn page(&self, resource: &R) -> Result<Self::Response, Error> {
+    fn try_stream(&self) -> BoxStream<Result<M, Error>>;
+    async fn get_by_id(&self, id: M::IdType) -> Result<Self::Response, Error>;
+    async fn fetch(&self, resource: &M) -> Result<Self::Response, Error> {
         self.get_by_id(resource.id()).await
     }
-    // fn url_by_id(&self, id: R::IdType) -> Result<url::Url, Error>;
-    // fn url(&self, resource: &R) -> Result<url::Url, Error> {
-    //     self.url_by_id(resource.id())
-    // }
 }
 
-pub struct ResourceService<R, Client>
+pub struct ResourceService<M, Client>
 where
-    Client: ResourceClient<R>,
-    R: ResourceMetadata<IdType = i32> + Sync,
+    Client: ResourceClient<M>,
+    M: ResourceMetadata<IdType = i32>,
 {
     pub client: Client,
     pub strategy: FetchStrategy,
-    pub collection: ResourceCollection<R>,
+    pub collection: ResourceCollection<M>,
 }
 
 #[async_trait]
-impl<R, Client> ResourceClient<R> for ResourceService<R, Client>
+impl<M, Client> ResourceClient<M> for ResourceService<M, Client>
 where
-    Client: ResourceClient<R> + Sync + Send,
-    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    Client: ResourceClient<M>,
+    M: ResourceMetadata<IdType = i32>,
 {
     type Response = Client::Response;
-    fn try_stream(&self) -> BoxStream<Result<R, Error>> {
+    fn try_stream(&self) -> BoxStream<Result<M, Error>> {
         self.client.try_stream()
     }
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
         self.client.get_by_id(id).await
     }
-    // fn url_by_id(&self, id: i32) -> Result<url::Url, Error> {
-    //     self.client.url_by_id(id)
-    // }
 }
 
-impl<R, Client> ResourceService<R, Client>
+impl<M, Client> ResourceService<M, Client>
 where
-    Client: ResourceClient<R> + Sync + Send,
-    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    Client: ResourceClient<M>,
+    M: ResourceMetadata<IdType = i32>,
 {
-    async fn updated(&self, item: R) -> Result<ResourceFindResult<R>, Error> {
+    pub fn new(client: Client, strategy: FetchStrategy, collection: Collection<M>) -> Self {
+        Self {
+            client,
+            strategy,
+            collection: ResourceCollection::new(collection),
+        }
+    }
+
+    async fn updated(&self, item: M) -> Result<ResourceFindResult<M>, Error> {
         let in_db = self.collection.find(&item).await?;
 
         let update = match in_db {
@@ -74,15 +76,15 @@ where
         Ok(update)
     }
 
-    async fn upsert(&self, item: &R) -> Result<Option<R>, Error> {
+    async fn upsert(&self, item: &M) -> Result<Option<M>, Error> {
         self.collection.upsert(item).await.map_err(Error::from)
     }
 
     /// Fetches all resources and their state in the database, as a stream.
-    fn compared_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<R>, Error>>
+    fn compared_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<M>, Error>>
     where
         Self: Sync,
-        R: 'stream,
+        M: 'stream,
     {
         let result = self
             .try_stream()
@@ -93,10 +95,10 @@ where
     }
 
     /// Fetches resources that are new or updated in the database, as a stream.
-    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<R>, Error>>
+    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<ResourceFindResult<M>, Error>>
     where
         Self: Sync,
-        R: Send + 'stream,
+        M: Send + 'stream,
     {
         let mut fetch_state = self.strategy.build();
         let result = self
@@ -116,9 +118,9 @@ where
     }
 
     /// Fetches resources that are new or updated in the database, as a vector.
-    pub async fn latests(&self) -> Result<Vec<ResourceFindResult<R>>, Error>
+    pub async fn latests(&self) -> Result<Vec<ResourceFindResult<M>>, Error>
     where
-        R: Send,
+        M: Send,
     {
         let stream = self.fused_stream();
         let result: Vec<_> = stream.try_collect().await?;
@@ -129,24 +131,11 @@ where
     }
 }
 
-impl<R, Client> ResourceService<R, Client>
-where
-    Client: ResourceClient<R> + Sync + Send,
-    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
-{
-    pub fn new(client: Client, strategy: FetchStrategy, collection: Collection<R>) -> Self {
-        Self {
-            client,
-            strategy,
-            collection: ResourceCollection::new(collection),
-        }
-    }
-}
 pub struct ResourceCollection<R: ResourceMetadata>(Collection<R>);
 
 impl<R> ResourceCollection<R>
 where
-    R: ResourceMetadata<IdType = i32> + Serialize + DeserializeOwned + Unpin + Send + Sync,
+    R: ResourceMetadata<IdType = i32>,
 {
     pub fn new(collection: Collection<R>) -> Self {
         Self(collection)
@@ -172,5 +161,12 @@ where
                 FindOneAndReplaceOptions::builder().upsert(true).build(),
             )
             .await
+    }
+}
+
+pub trait ResourceResponse {
+    fn title(&self) -> String;
+    fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
+        Ok(None)
     }
 }
