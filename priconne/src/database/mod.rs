@@ -22,7 +22,7 @@ impl PostCollection {
         source: &AnnouncementSource,
     ) -> Result<Option<Post>, mongodb::error::Error>
     where
-        R: ResourceMetadata<IdType = i32>,
+        R: ResourceMetadata,
     {
         self.find(resource.title(), resource.id(), source).await
     }

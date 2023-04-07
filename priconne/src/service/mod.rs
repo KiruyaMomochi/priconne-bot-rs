@@ -34,7 +34,7 @@ use self::{
     api::ApiClient,
     config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
-    resource::{ResourceClient, ResourceService},
+    resource::{ResourceClient, CommonResourceService, AnnouncementClient},
 };
 
 /// Resource fetch strategy.
@@ -89,7 +89,7 @@ impl FetchState<i32> {
         }
     }
 
-    pub fn keep_going<R: ResourceMetadata<IdType = i32>>(
+    pub fn keep_going<R: ResourceMetadata>(
         &mut self,
         resource: &R,
         is_update: bool,
@@ -185,18 +185,18 @@ impl PriconneService {
         })
     }
 
-    pub async fn service<A: Announcement>(&self, announcement: A) -> Result<(), Error> {
+    pub async fn service_announcement<A: Announcement>(&self, announcement: A) -> Result<(), Error> 
+    {
         let source = announcement.source();
         let service = announcement.build_service(&self);
         let results = service.latests().await.unwrap();
-        let client: <A as Announcement>::Client = service.client;
 
         for result in results {
             let announcement = self
                 .announcement_collection
                 .find_resource(result.item(), &source)
                 .await?;
-            let decision = AnnouncementDecision::new(source, result, announcement);
+            let decision = AnnouncementDecision::new(source.clone(), result, announcement);
             self.work_announcement(&service.client, decision).await?;
         }
 
@@ -205,14 +205,14 @@ impl PriconneService {
 
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
-    pub async fn work_announcement<R, C, P: AnnouncementPage>(
+    pub async fn work_announcement<M, C, P: AnnouncementPage>(
         &self,
         client: &C,
-        mut desicion: AnnouncementDecision<R>,
+        mut desicion: AnnouncementDecision<M>,
     ) -> Result<(), Error>
     where
-        R: ResourceMetadata<IdType = i32>,
-        C: ResourceClient<R, Response = AnnouncementResponse<P>>,
+        M: ResourceMetadata,
+        C: AnnouncementClient<M, P>,
     {
         let Some(metadata) = desicion.should_request() else {return Ok(());};
 

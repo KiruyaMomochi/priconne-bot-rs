@@ -82,7 +82,7 @@ enum Action {
     Edit,
 }
 
-impl<R: ResourceMetadata<IdType = i32> + Debug> AnnouncementDecision<R> {
+impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
     pub fn should_request(&self) -> Option<&R> {
         match self.action {
             Action::None => None,
@@ -107,7 +107,7 @@ impl<R: ResourceMetadata<IdType = i32> + Debug> AnnouncementDecision<R> {
 }
 
 /// TODO: random write, may all wrong
-impl<R: ResourceMetadata<IdType = i32> + Debug> AnnouncementDecision<R> {
+impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
     pub fn new(source: AnnouncementSource, find_result: MetadataFindResult<R>, announcement: Option<Post>) -> Self {
         Self {
             action: Self::get_action(&source, &find_result, &announcement),

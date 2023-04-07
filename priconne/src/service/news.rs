@@ -110,7 +110,7 @@ impl ResourceClient<News> for NewsClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::{resource::ResourceService, news::NewsClient, FetchStrategy};
+    use crate::service::{resource::CommonResourceService, news::NewsClient, FetchStrategy};
     use reqwest::Url;
 
     #[tokio::test]
@@ -125,7 +125,7 @@ mod tests {
             ignore_id_lt: Some(9999),
             ..Default::default()
         };
-        let service = ResourceService::new(client, strategy, collection);
+        let service = CommonResourceService::new(client, strategy, collection);
 
         let news = service.latests().await?;
         println!("{news:?}");

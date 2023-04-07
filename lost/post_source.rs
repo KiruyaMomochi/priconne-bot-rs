@@ -1,7 +1,7 @@
 
 pub trait PostSource<R>
 where
-    R: Resource<IdType = i32>,
+    R: Resource,
 {
     fn source(&self) -> Source;
 }
@@ -169,7 +169,7 @@ impl PostSource<Announce> for ApiClient {
 impl<R, Client> PostSource<R> for ResourceService<R, Client>
 where
     Client: ResourceClient<R> + PostSource<R>,
-    R: Resource<IdType = i32> + Sync,
+    R: Resource + Sync,
 {
     fn source(&self) -> crate::resource::post::sources::Source {
         self.client.source()
@@ -179,7 +179,7 @@ where
 impl<R, Client> PostSource<&R> for ResourceService<R, Client>
 where
     Client: ResourceClient<R> + PostSource<R>,
-    R: Resource<IdType = i32>,
+    R: Resource,
 {
     fn source(&self) -> crate::resource::post::sources::Source {
         self.client.source()

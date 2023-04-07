@@ -6,13 +6,14 @@ pub mod glossary;
 use crate::{
     insight::AnnouncementPage,
     service::{
-        resource::{ResourceClient, ResourceService},
+        resource::{CommonResourceService, ResourceClient, ResourceService, AnnouncementClient, AnnouncementService},
         PriconneService,
     },
     utils::HOUR,
 };
 pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
+use reqwest::Client;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::{
@@ -40,24 +41,21 @@ use regex::Regex;
 // }
 
 pub trait Resource {
-    type Metadata: ResourceMetadata<IdType = i32> + Sync;
-    type Client: ResourceClient<Self::Metadata> + Sync + Send;
+    type Metadata: ResourceMetadata;
+    type Service: ResourceService<Self::Metadata>;
 
     fn name(&self) -> &'static str;
-    fn build_service(
-        &self,
-        priconne: &PriconneService,
-    ) -> ResourceService<Self::Metadata, Self::Client>;
+    fn build_service(&self, priconne: &PriconneService) -> Self::Service;
     fn collection_name(&self) -> &'static str {
         self.name()
     }
 }
 
 pub trait Announcement: Resource
-where Self::Client: ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>,
 {
-    // type Client: ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>;
     type Page: AnnouncementPage;
+    type Service: AnnouncementService<Self::Metadata, Self::Page>;
+    fn build_service(&self, priconne: &PriconneService) -> <Self as Announcement>::Service;
     fn source(&self) -> AnnouncementSource;
 }
 
@@ -66,8 +64,7 @@ pub trait ResourceMetadata
 where
     Self: std::fmt::Debug + Sync + Send + Unpin + Serialize + DeserializeOwned,
 {
-    type IdType;
-    fn id(&self) -> Self::IdType;
+    fn id(&self) -> i32;
     fn title(&self) -> &str;
     fn update_time(&self) -> DateTime<Utc>;
 
@@ -76,7 +73,6 @@ where
 }
 
 impl ResourceMetadata for Announce {
-    type IdType = i32;
     fn is_update(&self, other: &Announce) -> bool {
         self.announce_id == other.announce_id
             && (self.title != other.title || self.replace_time > other.replace_time)
@@ -93,11 +89,10 @@ impl ResourceMetadata for Announce {
 }
 
 impl ResourceMetadata for News {
-    type IdType = i32;
     fn is_update(&self, other: &Self) -> bool {
         self.id == other.id && (self.title != other.title || self.date > other.date)
     }
-    fn id(&self) -> Self::IdType {
+    fn id(&self) -> i32 {
         self.id
     }
 
@@ -116,11 +111,10 @@ impl ResourceMetadata for News {
 }
 
 impl ResourceMetadata for Thumbnail {
-    type IdType = i32;
     fn is_update(&self, other: &Self) -> bool {
         self.id == other.id && (self.title != other.title || self.episode != other.episode)
     }
-    fn id(&self) -> Self::IdType {
+    fn id(&self) -> i32 {
         self.id
     }
 
@@ -138,11 +132,10 @@ impl<'a, T: ResourceMetadata> ResourceMetadata for &'a T
 where
     &'a T: for<'de> Deserialize<'de>,
 {
-    type IdType = T::IdType;
     fn is_update(&self, other: &Self) -> bool {
         T::is_update(self, other)
     }
-    fn id(&self) -> Self::IdType {
+    fn id(&self) -> i32 {
         T::id(self)
     }
     fn title(&self) -> &str {

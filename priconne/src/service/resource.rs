@@ -8,7 +8,11 @@ use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{resource::{ResourceMetadata, announcement::AnnouncementResponse}, Error};
+use crate::{
+    insight::AnnouncementPage,
+    resource::{announcement::AnnouncementResponse, ResourceMetadata},
+    Error,
+};
 
 use super::{update::MetadataFindResult, FetchStrategy};
 
@@ -17,20 +21,46 @@ use super::{update::MetadataFindResult, FetchStrategy};
 pub trait ResourceClient<M>
 where
     Self: Sync + Send,
-    M: ResourceMetadata<IdType = i32>,
+    M: ResourceMetadata,
 {
     type Response: ResourceResponse;
     fn try_stream(&self) -> BoxStream<Result<M, Error>>;
-    async fn get_by_id(&self, id: M::IdType) -> Result<Self::Response, Error>;
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error>;
     async fn fetch(&self, resource: &M) -> Result<Self::Response, Error> {
         self.get_by_id(resource.id()).await
     }
 }
 
-pub struct ResourceService<M, Client>
+#[async_trait]
+pub trait ResourceService<M>: ResourceClient<M>
+where
+    M: ResourceMetadata,
+{
+    async fn latests(&self) -> Result<Vec<MetadataFindResult<M>>, Error>;
+}
+
+#[async_trait]
+pub trait AnnouncementClient<M, P>:
+    ResourceClient<M, Response = AnnouncementResponse<P>>
+where
+    M: ResourceMetadata,
+    P: AnnouncementPage,
+{
+}
+
+#[async_trait]
+pub trait AnnouncementService<M, P>:
+    ResourceService<M, Response = AnnouncementResponse<P>>
+where
+    M: ResourceMetadata,
+    P: AnnouncementPage,
+{
+}
+
+pub struct CommonResourceService<M, Client>
 where
     Client: ResourceClient<M>,
-    M: ResourceMetadata<IdType = i32>,
+    M: ResourceMetadata,
 {
     pub client: Client,
     pub strategy: FetchStrategy,
@@ -38,10 +68,10 @@ where
 }
 
 #[async_trait]
-impl<M, Client> ResourceClient<M> for ResourceService<M, Client>
+impl<M, Client> ResourceClient<M> for CommonResourceService<M, Client>
 where
     Client: ResourceClient<M>,
-    M: ResourceMetadata<IdType = i32>,
+    M: ResourceMetadata,
 {
     type Response = Client::Response;
     fn try_stream(&self) -> BoxStream<Result<M, Error>> {
@@ -52,10 +82,10 @@ where
     }
 }
 
-impl<M, Client> ResourceService<M, Client>
+impl<M, Client> CommonResourceService<M, Client>
 where
     Client: ResourceClient<M>,
-    M: ResourceMetadata<IdType = i32>,
+    M: ResourceMetadata,
 {
     pub fn new(client: Client, strategy: FetchStrategy, collection: Collection<M>) -> Self {
         Self {
@@ -135,7 +165,7 @@ pub struct ResourceCollection<R: ResourceMetadata>(Collection<R>);
 
 impl<R> ResourceCollection<R>
 where
-    R: ResourceMetadata<IdType = i32>,
+    R: ResourceMetadata,
 {
     pub fn new(collection: Collection<R>) -> Self {
         Self(collection)
@@ -149,7 +179,7 @@ where
         self.find_by_id(&resource.id()).await
     }
 
-    pub async fn find_by_id(&self, id: &R::IdType) -> Result<Option<R>, mongodb::error::Error> {
+    pub async fn find_by_id(&self, id: &i32) -> Result<Option<R>, mongodb::error::Error> {
         self.inner().find_one(doc! { "_id": id }, None).await
     }
 
@@ -170,6 +200,4 @@ pub trait ResourceResponse {
     }
 }
 
-impl ResourceResponse for crate::resource::cartoon::CartoonPage {
-
-}
+impl ResourceResponse for crate::resource::cartoon::CartoonPage {}
