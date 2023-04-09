@@ -21,8 +21,8 @@ pub enum Error {
     #[error("regex error")]
     RegexError(#[from] regex::Error),
     #[error("cron error")]
-    CronError(#[from] cron::error::Error),
-    #[error("channel send `{0}` error")]
+    CronError(#[from] tokio_cron_scheduler::JobSchedulerError),
+    #[error("tokio cron `{0}` error")]
     SendError(String),
     #[error("kuchiki error")]
     KuchikiError,

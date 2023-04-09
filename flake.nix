@@ -1,28 +1,45 @@
 {
   description = "A basic flake with a shell";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-utils = {
+      url = "github:numtide/flake-utils";
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        overlays = [ fenix.overlays.default ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+          config = {
+            allowUnfree = true;
+          };
+        };
       in
       {
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
-            cargo
-            rustc
-            rust-analyzer
             pkg-config
             llvmPackages_latest.llvm
             llvmPackages_latest.bintools
             llvmPackages_latest.lld
             cargo-outdated
+            rust-analyzer-nightly
           ];
-          buildInputs = with pkgs; [ 
-            rustfmt
-            clippy
+          buildInputs = with pkgs; [
+            (pkgs.fenix.complete.withComponents [
+              "cargo"
+              "clippy"
+              "rust-src"
+              "rustc"
+              "rustfmt"
+            ])
             openssl
           ];
 

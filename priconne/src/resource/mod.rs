@@ -6,14 +6,14 @@ pub mod glossary;
 use crate::{
     insight::AnnouncementPage,
     service::{
-        resource::{CommonResourceService, ResourceClient, ResourceService, AnnouncementClient, AnnouncementService},
+        resource::{AnnouncementClient, ResourceClient, ResourceService},
         PriconneService,
     },
     utils::HOUR,
 };
 pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
-use reqwest::Client;
+use reqwest::{Client, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::{
@@ -42,22 +42,46 @@ use regex::Regex;
 
 pub trait Resource {
     type Metadata: ResourceMetadata;
-    type Service: ResourceService<Self::Metadata>;
+    type Client: ResourceClient<Self::Metadata>;
 
     fn name(&self) -> &'static str;
-    fn build_service(&self, priconne: &PriconneService) -> Self::Service;
+    fn build_service(
+        &self,
+        priconne: &PriconneService,
+    ) -> ResourceService<Self::Metadata, Self::Client>;
     fn collection_name(&self) -> &'static str {
         self.name()
     }
 }
 
-pub trait Announcement: Resource
-{
+pub trait Announcement {
     type Page: AnnouncementPage;
-    type Service: AnnouncementService<Self::Metadata, Self::Page>;
-    fn build_service(&self, priconne: &PriconneService) -> <Self as Announcement>::Service;
     fn source(&self) -> AnnouncementSource;
 }
+
+// pub trait BoundedAnnouncementResource: Announcement + Resource
+// where
+//     Self::Client:
+//         ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>
+//     // <Self as Resource>::Client:
+//     //     AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>,
+// {
+// }
+
+// impl<T> BoundedAnnouncementResource for T
+// where
+//     Self: Announcement + Resource<Metadata = <Self as Resource>::Metadata>,
+//     <Self as Resource>::Client: AnnouncementClient<<Self as Resource>::Metadata>,
+// {
+// }
+
+// pub trait AnnouncementResource: BoundedAnnouncementResource {}
+// impl<T: BoundedAnnouncementResource> AnnouncementResource for T {}
+
+pub trait AnnouncementResource = Announcement + Resource
+where
+    <Self as Resource>::Client:
+        AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
 
 /// Metadata for a resource
 pub trait ResourceMetadata

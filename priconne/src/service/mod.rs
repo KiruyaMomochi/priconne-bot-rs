@@ -22,7 +22,7 @@ use crate::{
         cartoon::Thumbnail,
         information::Announce,
         news::News,
-        Announcement, Resource, ResourceMetadata,
+        Announcement, AnnouncementResource, Resource, ResourceMetadata,
     },
     service::resource::ResourceResponse,
     utils,
@@ -34,7 +34,7 @@ use self::{
     api::ApiClient,
     config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
-    resource::{ResourceClient, CommonResourceService, AnnouncementClient},
+    resource::{AnnouncementClient, ResourceClient, ResourceService},
 };
 
 /// Resource fetch strategy.
@@ -89,11 +89,7 @@ impl FetchState<i32> {
         }
     }
 
-    pub fn keep_going<R: ResourceMetadata>(
-        &mut self,
-        resource: &R,
-        is_update: bool,
-    ) -> bool {
+    pub fn keep_going<R: ResourceMetadata>(&mut self, resource: &R, is_update: bool) -> bool {
         let id = resource.id();
         let update_time = resource.update_time();
 
@@ -185,7 +181,15 @@ impl PriconneService {
         })
     }
 
-    pub async fn service_announcement<A: Announcement>(&self, announcement: A) -> Result<(), Error> 
+    pub async fn serve_announcements<R: AnnouncementResource>(
+        &self,
+        announcement: R,
+    ) -> Result<(), Error>
+    where
+        // we need it to make rust-analyzer happy
+        // see [Add support for trait aliases](https://github.com/rust-lang/rust-analyzer/issues/2773)
+        // for more details
+        R: Announcement + Resource,
     {
         let source = announcement.source();
         let service = announcement.build_service(&self);
@@ -205,14 +209,14 @@ impl PriconneService {
 
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
-    pub async fn work_announcement<M, C, P: AnnouncementPage>(
+    pub async fn work_announcement<M, C>(
         &self,
         client: &C,
         mut desicion: AnnouncementDecision<M>,
     ) -> Result<(), Error>
     where
         M: ResourceMetadata,
-        C: AnnouncementClient<M, P>,
+        C: AnnouncementClient<M>,
     {
         let Some(metadata) = desicion.should_request() else {return Ok(());};
 
@@ -241,6 +245,33 @@ impl PriconneService {
             self.chat_manager.send_post(announcement).await;
         };
 
+        Ok(())
+    }
+
+    pub async fn serve_cartoons<R: Resource<Metadata = Thumbnail>>(
+        &self,
+        cartoon: R,
+    ) -> Result<(), Error> {
+        let service = cartoon.build_service(&self);
+        let results = service.latests().await.unwrap();
+
+        for result in results {
+            self.work_cartoon(&service.client, result).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn work_cartoon<C>(
+        &self,
+        client: &C,
+        result: MetadataFindResult<Thumbnail>,
+    ) -> Result<(), Error>
+    where
+        C: ResourceClient<Thumbnail>,
+    {
+        let cartoon = client.fetch(result.item()).await?;
+        self.chat_manager.send_post(&cartoon).await;
         Ok(())
     }
 }

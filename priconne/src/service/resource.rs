@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     insight::AnnouncementPage,
-    resource::{announcement::AnnouncementResponse, ResourceMetadata},
+    resource::{announcement::AnnouncementResponse, Resource, ResourceMetadata},
     Error,
 };
 
@@ -32,32 +32,23 @@ where
 }
 
 #[async_trait]
-pub trait ResourceService<M>: ResourceClient<M>
+pub trait AnnouncementClient<M>: ResourceClient<M, Response = AnnouncementResponse<Self::Page>>
 where
-    M: ResourceMetadata,
+    M: ResourceMetadata
 {
-    async fn latests(&self) -> Result<Vec<MetadataFindResult<M>>, Error>;
+    type Page: AnnouncementPage;
 }
 
-#[async_trait]
-pub trait AnnouncementClient<M, P>:
-    ResourceClient<M, Response = AnnouncementResponse<P>>
+impl<M, T, P> AnnouncementClient<M> for T
 where
     M: ResourceMetadata,
+    T: ResourceClient<M, Response = AnnouncementResponse<P>>,
     P: AnnouncementPage,
 {
+    type Page = P;
 }
 
-#[async_trait]
-pub trait AnnouncementService<M, P>:
-    ResourceService<M, Response = AnnouncementResponse<P>>
-where
-    M: ResourceMetadata,
-    P: AnnouncementPage,
-{
-}
-
-pub struct CommonResourceService<M, Client>
+pub struct ResourceService<M, Client>
 where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
@@ -68,7 +59,7 @@ where
 }
 
 #[async_trait]
-impl<M, Client> ResourceClient<M> for CommonResourceService<M, Client>
+impl<M, Client> ResourceClient<M> for ResourceService<M, Client>
 where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
@@ -82,7 +73,7 @@ where
     }
 }
 
-impl<M, Client> CommonResourceService<M, Client>
+impl<M, Client> ResourceService<M, Client>
 where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
