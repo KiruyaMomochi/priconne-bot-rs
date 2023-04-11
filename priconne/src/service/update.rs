@@ -71,7 +71,7 @@ pub struct AnnouncementDecision<R: ResourceMetadata> {
 
 /// Action to take
 #[derive(Debug)]
-enum Action {
+pub enum Action {
     /// Do nothing, just return
     None,
     /// Update post, but do not send or edit message
@@ -94,7 +94,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
     where
         E: Serialize + DeserializeOwned,
     {
-        self.announcement = Some(data.push_into(self.announcement));
+        data.push_inplace(&mut self.announcement);
         self.announcement.as_ref()
     }
 
@@ -127,7 +127,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
             debug!("old post is None. creating a new one");
             return Action::Send;
         }
-        let post = post.unwrap();
+        let post = post.as_ref().unwrap();
 
         // find resource with same source
         let same_source = post.data.iter().any(|p| &p.source == source);

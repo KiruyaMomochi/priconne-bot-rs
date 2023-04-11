@@ -10,6 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     insight::AnnouncementPage,
+    message::PostMessage,
     resource::{announcement::AnnouncementResponse, Resource, ResourceMetadata},
     Error,
 };
@@ -31,10 +32,17 @@ where
     }
 }
 
-#[async_trait]
-pub trait AnnouncementClient<M>: ResourceClient<M, Response = AnnouncementResponse<Self::Page>>
+// #[async_trait]
+pub trait SendableResourceClient<M> = ResourceClient<M>
 where
-    M: ResourceMetadata
+    <Self as ResourceClient<M>>::Response: PostMessage,
+    M: ResourceMetadata;
+
+#[async_trait]
+pub trait AnnouncementClient<M>:
+    ResourceClient<M, Response = AnnouncementResponse<Self::Page>>
+where
+    M: ResourceMetadata,
 {
     type Page: AnnouncementPage;
 }

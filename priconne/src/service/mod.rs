@@ -13,19 +13,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::{debug, trace};
 
 use crate::{
-    database::{Post, PostCollection},
+    database::PostCollection,
     error::Error,
     insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
-    message::ChatManager,
+    message::{ChatManager, PostMessage},
     resource::{
-        announcement::{sources::AnnouncementSource, AnnouncementResponse},
-        cartoon::Thumbnail,
-        information::Announce,
-        news::News,
-        Announcement, AnnouncementResource, Resource, ResourceMetadata,
+        cartoon::Thumbnail, Announcement, AnnouncementResource, Resource, ResourceMetadata,
     },
     service::resource::ResourceResponse,
-    utils,
 };
 
 use update::{AnnouncementDecision, MetadataFindResult};
@@ -34,7 +29,7 @@ use self::{
     api::ApiClient,
     config::{FetchConfig, ServerConfig, StrategyConfig},
     news::NewsClient,
-    resource::{AnnouncementClient, ResourceClient, ResourceService},
+    resource::{AnnouncementClient, ResourceClient, ResourceService, SendableResourceClient},
 };
 
 /// Resource fetch strategy.
@@ -130,26 +125,30 @@ impl FetchState<i32> {
 
     pub fn should_fetch(&self) -> bool {
         match self.strategy.fuse_limit {
-            Some(fuse_limit) => self.fuse_count < self.fuse_count,
+            Some(fuse_limit) => self.fuse_count < fuse_limit,
             None => true,
         }
     }
 }
 
-// #[derive(Debug)]
+/// Central service for Priconne resource management.
+/// It contains all the resources and their corresponding services.
+///
+/// Build a resource service when needed, instead of building all of them at once.
+/// That requires keep a full strategy list and a resource list, but have a better
+/// generalization.
+///
+/// Alternative implementation:
+/// ```rust,ignore
+/// pub news_service: ResourceService<News, NewsClient>,
+/// pub information_service: ResourceService<Announce, ApiClient>,
+/// pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
+/// ```
 pub struct PriconneService {
-    // pub client: reqwest::Client,
     pub database: mongodb::Database,
     pub announcement_collection: PostCollection,
     pub telegraph: telegraph_rs::Telegraph,
-    // Alternative implementation:
-    // pub news_service: ResourceService<News, NewsClient>,
-    // pub information_service: ResourceService<Announce, ApiClient>,
-    // pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
 
-    // Build a resource service when needed, instead of building all of them at once.
-    // That requires keep a full strategy list and a resource list, but have a better
-    // generalization.
     pub client: reqwest::Client,
     pub config: FetchConfig,
     pub extractor: Extractor,
@@ -251,7 +250,10 @@ impl PriconneService {
     pub async fn serve_cartoons<R: Resource<Metadata = Thumbnail>>(
         &self,
         cartoon: R,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        R::Client: SendableResourceClient<R::Metadata>,
+    {
         let service = cartoon.build_service(&self);
         let results = service.latests().await.unwrap();
 
@@ -268,7 +270,7 @@ impl PriconneService {
         result: MetadataFindResult<Thumbnail>,
     ) -> Result<(), Error>
     where
-        C: ResourceClient<Thumbnail>,
+        C: SendableResourceClient<Thumbnail> + ResourceClient<Thumbnail>,
     {
         let cartoon = client.fetch(result.item()).await?;
         self.chat_manager.send_post(&cartoon).await;

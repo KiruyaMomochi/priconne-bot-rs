@@ -8,7 +8,7 @@ pub use event::{get_events, EventPeriod};
 use chrono::{DateTime, FixedOffset, Utc};
 use linked_hash_set::LinkedHashSet;
 use mongodb::bson;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::{
@@ -43,14 +43,13 @@ impl<E> AnnouncementInsight<E>
 where
     E: Serialize + DeserializeOwned,
 {
-    pub fn push_into(self, post: Option<Post>) -> Post {
-        match post {
-            Some(mut post) => {
+    pub fn push_inplace(self, post: &mut Option<Post>) {
+        match post.as_mut() {
+            Some(post) => {
                 post.push(self);
-                post
             }
-            None => Post::new(self),
-        }
+            None => *post = Some(Post::new(self)),
+        };
     }
 }
 
