@@ -5,7 +5,7 @@ use teloxide::requests::Requester;
 
 use crate::{
     insight::{tagging::RegexTagger, Extractor},
-    service::{api::ApiClient, news::NewsClient}, message::ChatManager, database::PostCollection, resource::Resource,
+    service::{api::ApiClient, news::NewsClient}, message::ChatManager, database::AnnouncementCollection, resource::Resource,
 };
 
 use super::{api::ApiServer, FetchStrategy, PriconneService};
@@ -189,9 +189,9 @@ impl TelegramConfig {
 
 impl StrategyConfig {
     pub fn build_for<R: Resource>(&self, resource: &R) -> FetchStrategy {
-        let name = resource.name().clone();
+        let name = resource.name().to_owned();
         let mut result = self.base.clone();
-        if let Some(over) = self.overrides.get(name.clone()) {
+        if let Some(over) = self.overrides.get(&name) {
             result = result.override_by(over)
         }
 
@@ -211,7 +211,7 @@ impl PriconneConfig {
         };
 
         return Ok(PriconneService {
-            announcement_collection: PostCollection(database.collection("posts")),
+            announcement_collection: AnnouncementCollection(database.collection("posts")),
             database,
             telegraph,
             client,

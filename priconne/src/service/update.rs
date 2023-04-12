@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::debug;
 
 use crate::{
-    database::{Post, PostCollection},
+    database::{Post, AnnouncementCollection},
     insight::AnnouncementInsight,
     resource::{announcement::sources::AnnouncementSource, ResourceMetadata},
 };

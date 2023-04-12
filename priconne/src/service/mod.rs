@@ -13,7 +13,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::{debug, trace};
 
 use crate::{
-    database::PostCollection,
+    database::AnnouncementCollection,
     error::Error,
     insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
     message::{ChatManager, PostMessage},
@@ -146,7 +146,7 @@ impl FetchState<i32> {
 /// ```
 pub struct PriconneService {
     pub database: mongodb::Database,
-    pub announcement_collection: PostCollection,
+    pub announcement_collection: AnnouncementCollection,
     pub telegraph: telegraph_rs::Telegraph,
 
     pub client: reqwest::Client,
@@ -163,7 +163,7 @@ impl PriconneService {
         client: reqwest::Client,
         config: FetchConfig,
     ) -> Result<PriconneService, Error> {
-        let post_collection = PostCollection(database.collection("posts"));
+        let announcement_collection = AnnouncementCollection(database.collection("announcements"));
 
         let extractor = Extractor {
             tagger: RegexTagger { tag_rules: vec![] },
@@ -171,7 +171,7 @@ impl PriconneService {
 
         Ok(Self {
             database,
-            announcement_collection: post_collection,
+            announcement_collection,
             chat_manager,
             extractor,
             telegraph,

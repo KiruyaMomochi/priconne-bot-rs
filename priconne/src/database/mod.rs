@@ -9,9 +9,9 @@ use crate::resource::{
     ResourceMetadata,
 };
 
-pub struct PostCollection(pub Collection<Post>);
+pub struct AnnouncementCollection(pub Collection<Post>);
 
-impl PostCollection {
+impl AnnouncementCollection {
     pub fn posts(&self) -> Collection<Post> {
         self.0.clone()
     }
