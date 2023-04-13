@@ -1,5 +1,9 @@
 {
     "editor.formatOnType": true,
     "editor.formatOnPaste": true,
-    "rust-analyzer.server.path": "rust-analyzer"
+    "rust-analyzer.server.path": "rust-analyzer",
+    "rust-analyzer.linkedProjects": [
+        "./priconne/Cargo.toml",
+        "./priconne/Cargo.toml"
+    ]
 }

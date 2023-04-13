@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     insight::AnnouncementPage,
-    message::PostMessage,
+    message::Sendable,
     resource::{announcement::AnnouncementResponse, Resource, ResourceMetadata},
     Error,
 };
@@ -32,56 +32,25 @@ where
     }
 }
 
-// #[async_trait]
+/// When the response of a resource client is sendable, the client is sendable
 pub trait SendableResourceClient<M> = ResourceClient<M>
 where
-    <Self as ResourceClient<M>>::Response: PostMessage,
+    <Self as ResourceClient<M>>::Response: Sendable,
     M: ResourceMetadata;
 
-#[async_trait]
-pub trait AnnouncementClient<M>:
-    ResourceClient<M, Response = AnnouncementResponse<Self::Page>>
-where
-    M: ResourceMetadata,
-{
-    type Page: AnnouncementPage;
-}
 
-impl<M, T, P> AnnouncementClient<M> for T
-where
-    M: ResourceMetadata,
-    T: ResourceClient<M, Response = AnnouncementResponse<P>>,
-    P: AnnouncementPage,
-{
-    type Page = P;
-}
-
-pub struct ResourceService<M, Client>
+/// Wrapped `ResourceClient` that memorizes the fetched resource metadata.
+pub struct MemorizedResourceClient<M, Client>
 where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
 {
     pub client: Client,
     pub strategy: FetchStrategy,
-    pub collection: ResourceCollection<M>,
+    pub collection: ResourceMetadataCollection<M>,
 }
 
-#[async_trait]
-impl<M, Client> ResourceClient<M> for ResourceService<M, Client>
-where
-    Client: ResourceClient<M>,
-    M: ResourceMetadata,
-{
-    type Response = Client::Response;
-    fn try_stream(&self) -> BoxStream<Result<M, Error>> {
-        self.client.try_stream()
-    }
-    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
-        self.client.get_by_id(id).await
-    }
-}
-
-impl<M, Client> ResourceService<M, Client>
+impl<M, Client> MemorizedResourceClient<M, Client>
 where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
@@ -90,7 +59,7 @@ where
         Self {
             client,
             strategy,
-            collection: ResourceCollection::new(collection),
+            collection: ResourceMetadataCollection::new(collection),
         }
     }
 
@@ -160,9 +129,25 @@ where
     }
 }
 
-pub struct ResourceCollection<R: ResourceMetadata>(Collection<R>);
+#[async_trait]
+impl<M, Client> ResourceClient<M> for MemorizedResourceClient<M, Client>
+where
+    Client: ResourceClient<M>,
+    M: ResourceMetadata,
+{
+    type Response = Client::Response;
+    fn try_stream(&self) -> BoxStream<Result<M, Error>> {
+        self.client.try_stream()
+    }
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
+        self.client.get_by_id(id).await
+    }
+}
 
-impl<R> ResourceCollection<R>
+
+pub struct ResourceMetadataCollection<R: ResourceMetadata>(Collection<R>);
+
+impl<R> ResourceMetadataCollection<R>
 where
     R: ResourceMetadata,
 {

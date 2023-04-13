@@ -6,7 +6,7 @@ pub mod glossary;
 use crate::{
     insight::AnnouncementPage,
     service::{
-        resource::{AnnouncementClient, ResourceClient, ResourceService},
+        resource::{ResourceClient, MemorizedResourceClient},
         PriconneService,
     },
     utils::HOUR,
@@ -17,29 +17,14 @@ use reqwest::{Client, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::{
-    announcement::{sources::AnnouncementSource, AnnouncementResponse},
+    announcement::{sources::AnnouncementSource, AnnouncementResponse, Announcement},
     cartoon::Thumbnail,
     information::Announce,
     news::News,
 };
 use regex::Regex;
 
-// pub enum Resource {
-//     Announce,
-//     News,
-//     Cartoon,
-// }
-
-// impl Resource {
-//     pub fn name(&self) -> &'static str {
-//         match self {
-//             Resource::Announce => "announce",
-//             Resource::News => "news",
-//             Resource::Cartoon => "cartoon",
-//         }
-//     }
-// }
-
+/// Resource is assets in Priconne world, this can be an announcement or a cartoon page
 pub trait Resource {
     type Metadata: ResourceMetadata;
     type Client: ResourceClient<Self::Metadata>;
@@ -48,40 +33,11 @@ pub trait Resource {
     fn build_service(
         &self,
         priconne: &PriconneService,
-    ) -> ResourceService<Self::Metadata, Self::Client>;
+    ) -> MemorizedResourceClient<Self::Metadata, Self::Client>;
     fn collection_name(&self) -> &'static str {
         self.name()
     }
 }
-
-pub trait Announcement {
-    type Page: AnnouncementPage;
-    fn source(&self) -> AnnouncementSource;
-}
-
-// pub trait BoundedAnnouncementResource: Announcement + Resource
-// where
-//     Self::Client:
-//         ResourceClient<Self::Metadata, Response = AnnouncementResponse<Self::Page>>
-//     // <Self as Resource>::Client:
-//     //     AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>,
-// {
-// }
-
-// impl<T> BoundedAnnouncementResource for T
-// where
-//     Self: Announcement + Resource<Metadata = <Self as Resource>::Metadata>,
-//     <Self as Resource>::Client: AnnouncementClient<<Self as Resource>::Metadata>,
-// {
-// }
-
-// pub trait AnnouncementResource: BoundedAnnouncementResource {}
-// impl<T: BoundedAnnouncementResource> AnnouncementResource for T {}
-
-pub trait AnnouncementResource = Announcement + Resource
-where
-    <Self as Resource>::Client:
-        AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
 
 /// Metadata for a resource
 pub trait ResourceMetadata

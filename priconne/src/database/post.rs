@@ -5,7 +5,7 @@ use serde_with::serde_as;
 
 use crate::{
     insight::{EventPeriod, AnnouncementInsight, Tags},
-    message::PostMessage,
+    message::Sendable,
     resource::announcement::{sources::AnnouncementSource, AnnouncementResponse, self},
     service::Region,
 };
@@ -166,7 +166,7 @@ impl PostData<bson::Bson> {
     }
 }
 
-impl PostMessage for Post {
+impl Sendable for Post {
     fn message(&self) -> crate::message::Message {
         let data = self.data.last().unwrap();
         let text = data.build_message(self);

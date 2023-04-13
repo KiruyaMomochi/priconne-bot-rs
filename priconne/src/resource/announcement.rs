@@ -1,7 +1,7 @@
 use crate::{
     insight::{AnnouncementInsight, AnnouncementPage},
-    message::{Message, PostMessage},
-    service::resource::ResourceResponse,
+    message::{Message, Sendable},
+    service::{resource::ResourceResponse, announcement::AnnouncementClient},
 };
 
 use mongodb::bson;
@@ -9,6 +9,19 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use self::sources::AnnouncementSource;
+
+use super::Resource;
+
+pub trait Announcement {
+    type Page: AnnouncementPage;
+    fn source(&self) -> AnnouncementSource;
+}
+
+pub trait AnnouncementResource = Announcement + Resource
+where
+    <Self as Resource>::Client:
+        AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
+
 
 pub mod sources {
     use super::*;

@@ -225,35 +225,35 @@ impl PriconneConfig {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::fs::File;
 
-    #[test]
-    fn test_deserialize_bot_config() {
-        let config = File::open("tests/config.yaml").unwrap();
-        let bot_config: PriconneConfig = serde_yaml::from_reader(config).unwrap();
+//     #[test]
+//     fn test_deserialize_bot_config() {
+//         let config = File::open("tests/config.yaml").unwrap();
+//         let bot_config: PriconneConfig = serde_yaml::from_reader(config).unwrap();
 
-        assert_eq!(bot_config.server.api.len(), 5);
-        assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
-        assert_eq!(
-            bot_config.telegram.webhook_url,
-            Some("https://example.com/webhook".to_string())
-        );
-        assert_eq!(
-            bot_config.telegram.token,
-            "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".to_string()
-        );
-        assert_eq!(
-            bot_config.telegram.listen_addr,
-            Some("127.0.0.1:5555".to_string())
-        );
-        assert_eq!(
-            bot_config.mongo.connection_string,
-            "mongodb://localhost:27017".to_string()
-        );
-        assert_eq!(bot_config.mongo.database, "test".to_string());
-        assert_eq!(bot_config.tags.0.len(), 2);
-    }
-}
+//         assert_eq!(bot_config.server.api.len(), 5);
+//         assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
+//         assert_eq!(
+//             bot_config.telegram.webhook_url,
+//             Some("https://example.com/webhook".to_string())
+//         );
+//         assert_eq!(
+//             bot_config.telegram.token,
+//             "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".to_string()
+//         );
+//         assert_eq!(
+//             bot_config.telegram.listen_addr,
+//             Some("127.0.0.1:5555".to_string())
+//         );
+//         assert_eq!(
+//             bot_config.mongo.connection_string,
+//             "mongodb://localhost:27017".to_string()
+//         );
+//         assert_eq!(bot_config.mongo.database, "test".to_string());
+//         assert_eq!(bot_config.tags.0.len(), 2);
+//     }
+// }

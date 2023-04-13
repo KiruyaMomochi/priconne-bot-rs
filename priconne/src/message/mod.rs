@@ -27,7 +27,7 @@ pub struct Message {
     pub results: Vec<SendResult>,
 }
 
-pub trait PostMessage {
+pub trait Sendable {
     fn message(&self) -> Message;
 }
 
@@ -57,7 +57,7 @@ impl ChatManager {
 
     pub async fn send_post<M>(&self, post: &M)
     where
-        M: PostMessage,
+        M: Sendable,
     {
         self.send_to::<Recipient, M>(post.message(), self.post_recipient())
             .await.unwrap();
