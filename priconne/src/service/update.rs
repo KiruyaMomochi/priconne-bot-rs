@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 use tracing::debug;
 
 use crate::{
-    database::{Announcement, AnnouncementCollection},
+    database::{Announcement},
     insight::AnnouncementInsight,
     resource::{announcement::sources::AnnouncementSource, ResourceMetadata},
 };

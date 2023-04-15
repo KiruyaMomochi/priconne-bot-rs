@@ -12,13 +12,13 @@ use crate::{
     utils::HOUR,
 };
 use chrono::{DateTime, FixedOffset, Utc};
-use reqwest::{Client, Response};
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use information::Announce;
 use news::News;
 use cartoon::Thumbnail;
-use regex::Regex;
+
 
 /// Resource is assets in Priconne world, this can be an announcement or a cartoon page
 pub trait Resource {
@@ -125,5 +125,5 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 }

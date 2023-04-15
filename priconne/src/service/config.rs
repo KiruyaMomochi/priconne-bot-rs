@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 use teloxide::requests::Requester;
 
 use crate::{
-    insight::{tagging::RegexTagger, Extractor},
-    service::{api::ApiClient, news::NewsClient}, message::ChatManager, database::AnnouncementCollection, resource::Resource,
+    insight::{tagging::RegexTagger, Extractor}, message::ChatManager, resource::Resource,
 };
 
 use super::{api::ApiServer, PriconneService, resource::FetchStrategy};
@@ -210,7 +209,7 @@ impl PriconneConfig {
             tagger
         };
 
-        return Ok(PriconneService {
+        Ok(PriconneService {
             database,
             telegraph,
             client,
@@ -220,7 +219,7 @@ impl PriconneConfig {
                 bot,
                 post_recipient: teloxide::types::Recipient::ChannelUsername("@pcrtwstat".to_owned()),
             },
-        });
+        })
     }
 }
 

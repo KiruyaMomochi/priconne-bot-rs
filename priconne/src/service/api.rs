@@ -82,7 +82,9 @@ impl ApiClient {
 
     pub fn announce_try_stream(&self) -> impl Stream<Item = Result<Announce, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_ajax);
-        let stream = stream
+        
+
+        stream
             .map_ok(|ajax_announce| {
                 ajax_announce
                     .announce_list
@@ -91,9 +93,7 @@ impl ApiClient {
                     .map(Ok)
             })
             .map_ok(futures::stream::iter)
-            .try_flatten();
-
-        stream
+            .try_flatten()
     }
 }
 
@@ -180,12 +180,12 @@ impl ApiClient {
 
     pub fn thumbnail_try_stream(&self) -> impl Stream<Item = Result<Thumbnail, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_thumbnails);
-        let stream = stream
-            .map_ok(|x| x.into_iter().map(Ok))
-            .map_ok(futures::stream::iter)
-            .try_flatten();
+        
 
         stream
+            .map_ok(|x| x.into_iter().map(Ok))
+            .map_ok(futures::stream::iter)
+            .try_flatten()
     }
 }
 

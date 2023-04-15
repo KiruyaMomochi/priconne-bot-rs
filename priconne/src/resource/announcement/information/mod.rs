@@ -31,7 +31,7 @@ impl ResourceService<MetadataFindResult<Announce>> for ApiAnnouncement {
     /// Collect latest metadata
     async fn collect_latests(
         &self,
-        priconne: &PriconneService,
+        _priconne: &PriconneService,
     ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
         self.client.latests().await
     }

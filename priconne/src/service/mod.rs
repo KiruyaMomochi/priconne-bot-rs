@@ -8,34 +8,27 @@ pub mod update;
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
-use futures::StreamExt;
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tracing::{debug, trace};
+
+
+use serde::{Deserialize, Serialize};
+
 
 use crate::{
-    database::AnnouncementCollection,
     error::Error,
     insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
-    message::{ChatManager, Sendable},
+    message::{ChatManager},
     resource::{
-        announcement::{sources::AnnouncementSource, Announcement, AnnouncementResource},
         cartoon::Thumbnail,
-        information::Announce,
         Resource, ResourceMetadata,
     },
-    service::resource::ResourceResponse,
 };
 
-use update::{AnnouncementDecision, MetadataFindResult};
+use update::{MetadataFindResult};
 
 use self::{
-    announcement::AnnouncementClient,
-    api::ApiClient,
-    config::{FetchConfig, ServerConfig, StrategyConfig},
-    news::NewsClient,
-    resource::{MemorizedResourceClient, ResourceClient, SendableResourceClient},
+    config::{FetchConfig},
+    resource::{ResourceClient, SendableResourceClient},
 };
 
 // pub trait ServiceBuilder {
@@ -192,7 +185,7 @@ impl PriconneService {
     where
         R::Client: SendableResourceClient<R::Metadata>,
     {
-        let service = cartoon.build_service(&self);
+        let service = cartoon.build_service(self);
         let results = service.latests().await.unwrap();
 
         for result in results {

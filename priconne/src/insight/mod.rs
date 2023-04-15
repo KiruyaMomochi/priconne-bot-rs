@@ -7,7 +7,7 @@ pub use event::{get_events, EventPeriod};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use linked_hash_set::LinkedHashSet;
-use mongodb::bson;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 

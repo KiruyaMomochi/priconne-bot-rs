@@ -36,7 +36,7 @@ impl ChatManager {
         self.post_recipient.clone()
     }
 
-    async fn send_to<C, M>(&self, mut message: Message, chat_id: C) -> Result<Message, RequestError>
+    async fn send_to<C>(&self, mut message: Message, chat_id: C) -> Result<Message, RequestError>
     where
         C: Into<Recipient> + Clone,
     {
@@ -59,7 +59,7 @@ impl ChatManager {
     where
         M: Sendable,
     {
-        self.send_to::<Recipient, M>(post.message(), self.post_recipient())
+        self.send_to::<Recipient>(post.message(), self.post_recipient())
             .await.unwrap();
     }
 }

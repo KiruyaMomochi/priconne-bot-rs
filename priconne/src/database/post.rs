@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use mongodb::bson;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
@@ -6,7 +6,7 @@ use serde_with::serde_as;
 use crate::{
     insight::{EventPeriod, AnnouncementInsight, Tags},
     message::Sendable,
-    resource::announcement::{sources::AnnouncementSource, AnnouncementResponse, self},
+    resource::announcement::{sources::AnnouncementSource},
     service::Region,
 };
 

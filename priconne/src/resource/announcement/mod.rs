@@ -2,14 +2,13 @@ pub mod information;
 pub mod news;
 
 use crate::{
-    insight::{AnnouncementInsight, AnnouncementPage},
-    message::{Message, Sendable},
+    insight::{AnnouncementPage},
     service::{announcement::AnnouncementClient, resource::ResourceResponse},
 };
 
 use mongodb::bson;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+
 
 use self::sources::AnnouncementSource;
 
@@ -40,7 +39,7 @@ pub mod sources {
     impl AnnouncementSource {
         pub fn name(&self) -> String {
             match self {
-                AnnouncementSource::Api(id) => "announce".to_string(),
+                AnnouncementSource::Api(_id) => "announce".to_string(),
                 AnnouncementSource::Website => "news".to_string(),
             }
         }
@@ -89,7 +88,7 @@ where
             content.push(telegraph_rs::Node::NodeElement(telegraph_rs::NodeElement {
                 tag: "code".to_string(),
                 attrs: None,
-                children: Some(vec![telegraph_rs::Node::Text(data_json.to_string())]),
+                children: Some(vec![telegraph_rs::Node::Text(data_json)]),
             }));
         }
 

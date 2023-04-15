@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt, TryStream, Stream};
+use futures::{stream::BoxStream, StreamExt, TryStreamExt, Stream};
 
 use html5ever::tendril::TendrilSink;
 use reqwest::{Response, Url};
@@ -68,12 +68,12 @@ impl NewsClient {
         let stream =
             futures::stream::try_unfold((Some(self.list_href(1)), self), try_next_news_list);
 
-        let stream = stream
-            .map_ok(|news_list| news_list.news_list.into_iter().map(Ok))
-            .map_ok(futures::stream::iter)
-            .try_flatten();
+        
 
         stream
+            .map_ok(|news_list| news_list.news_list.into_iter().map(Ok))
+            .map_ok(futures::stream::iter)
+            .try_flatten()
     }
 }
 

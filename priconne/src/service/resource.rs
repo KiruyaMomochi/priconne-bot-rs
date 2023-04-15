@@ -6,12 +6,11 @@ use futures::{
 };
 use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
-use serde::{de::DeserializeOwned, Serialize, Deserialize};
+use serde::{Serialize, Deserialize};
 
 use crate::{
-    insight::AnnouncementPage,
     message::Sendable,
-    resource::{announcement::AnnouncementResponse, Resource, ResourceMetadata},
+    resource::{ResourceMetadata},
     Error,
 };
 
@@ -276,7 +275,7 @@ where
 }
 
 pub trait ResourceResponse {
-    fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
+    fn telegraph_content(&self, _extra: Option<String>) -> Result<Option<String>, crate::Error> {
         Ok(None)
     }
 }

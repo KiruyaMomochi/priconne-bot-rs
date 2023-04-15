@@ -23,7 +23,7 @@ impl RegexTagger {
             .map(|(_regex, tag)| tag.to_string())
     }
 
-    pub fn tag_title<'a>(&self, title: &'a str) -> LinkedHashSet<String> {
+    pub fn tag_title(&self, title: &str) -> LinkedHashSet<String> {
         let mut title = title;
         let mut tags = LinkedHashSet::new();
 
