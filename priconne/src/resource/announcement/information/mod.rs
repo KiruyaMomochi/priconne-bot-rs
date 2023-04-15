@@ -5,22 +5,25 @@ use tracing::trace;
 
 use crate::{
     database::AnnouncementCollection,
+    insight::Extractor,
     service::{
         api::ApiClient,
         resource::{MemorizedResourceClient, ResourceClient, ResourceResponse},
         update::{AnnouncementDecision, MetadataFindResult},
         PriconneService, ResourceService,
     },
-    Error, insight::Extractor,
+    Error,
 };
 
 use super::sources::AnnouncementSource;
 
 pub struct ApiAnnouncement {
     client: MemorizedResourceClient<Announce, ApiClient>,
-    extractor: Extractor,
     source: AnnouncementSource,
+
     announcement_collection: AnnouncementCollection,
+    telegraph: telegraph_rs::Telegraph,
+    extractor: Extractor,
 }
 
 #[async_trait]
@@ -40,50 +43,45 @@ impl ResourceService<MetadataFindResult<Announce>> for ApiAnnouncement {
         priconne: &PriconneService,
         metadata: MetadataFindResult<Announce>,
     ) -> Result<(), Error> {
-        let source = self.source;
+        let source = self.source.clone();
 
         let announcement = self
             .announcement_collection
             .find_resource(metadata.item(), &source)
             .await?;
 
-        let decision = AnnouncementDecision::new(source.clone(), metadata, announcement);
+        let mut decision = AnnouncementDecision::new(source.clone(), metadata, announcement);
 
         let Some(metadata) = decision.should_request() else {return Ok(());};
-        let extractor = priconne.extractor.clone();
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
         let (mut data, content) = {
+            let extractor = self.extractor.clone();
             let response = self.client.fetch(metadata).await?;
             let data = extractor.extract_announcement(&response);
             let extra = Some(serde_json::to_string_pretty(&data.extra)?);
 
-            (
-                data,
-                response.telegraph_content(extra)?,
-            )
+            (data, response.telegraph_content(extra)?)
         };
 
         // extract data
         // TODO: telegraph patch in utils
-        let title = data.title;
-
-        let telegraph = priconne
+        let telegraph = self
             .telegraph
-            .create_page(&title, &content.unwrap(), false)
+            .create_page(&data.title, &content.unwrap(), false)
             .await?;
 
-        // data.telegraph_url = Some(telegraph.url);
+        data.telegraph_url = Some(telegraph.url);
 
-        // trace!("{data:?}");
-        // if let Some(announcement) = decision.update_announcement(data) {
-        //     self.announcement_collection.upsert(&announcement).await?;
-        // };
+        trace!("{data:?}");
+        if let Some(announcement) = decision.update_announcement(data) {
+            self.announcement_collection.upsert(announcement).await?;
+        };
 
-        // if let Some(announcement) = decision.send_post_and_continue() {
-        //     priconne.chat_manager.send_post(announcement).await;
-        // };
+        if let Some(announcement) = decision.send_post_and_continue() {
+            priconne.chat_manager.send_post(announcement).await;
+        };
 
         Ok(())
     }

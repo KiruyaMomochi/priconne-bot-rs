@@ -8,7 +8,7 @@ use crate::{
     service::{api::ApiClient, news::NewsClient}, message::ChatManager, database::AnnouncementCollection, resource::Resource,
 };
 
-use super::{api::ApiServer, FetchStrategy, PriconneService};
+use super::{api::ApiServer, PriconneService, resource::FetchStrategy};
 
 /// This is useful for setting values in builder.
 macro_rules! set_some {
@@ -211,7 +211,6 @@ impl PriconneConfig {
         };
 
         return Ok(PriconneService {
-            announcement_collection: AnnouncementCollection(database.collection("posts")),
             database,
             telegraph,
             client,
