@@ -1,5 +1,5 @@
 mod post;
-pub use post::Post;
+pub use post::Announcement;
 
 use mongodb::{bson::doc, options::FindOneOptions, Collection};
 use regex::Regex;
@@ -9,10 +9,10 @@ use crate::resource::{
     ResourceMetadata,
 };
 
-pub struct AnnouncementCollection(pub Collection<Post>);
+pub struct AnnouncementCollection(pub Collection<Announcement>);
 
 impl AnnouncementCollection {
-    pub fn posts(&self) -> Collection<Post> {
+    pub fn posts(&self) -> Collection<Announcement> {
         self.0.clone()
     }
 
@@ -20,7 +20,7 @@ impl AnnouncementCollection {
         &self,
         resource: &R,
         source: &AnnouncementSource,
-    ) -> Result<Option<Post>, mongodb::error::Error>
+    ) -> Result<Option<Announcement>, mongodb::error::Error>
     where
         R: ResourceMetadata,
     {
@@ -35,7 +35,7 @@ impl AnnouncementCollection {
         title: &str,
         id: i32,
         source: &AnnouncementSource,
-    ) -> Result<Option<Post>, mongodb::error::Error> {
+    ) -> Result<Option<Announcement>, mongodb::error::Error> {
         let mapped = map_title(title);
         let in24hours = chrono::Utc::now() - chrono::Duration::hours(24);
         // let source_field = &format!("source.{}", source.name());
@@ -70,7 +70,7 @@ impl AnnouncementCollection {
 
     pub async fn upsert(
         &self,
-        post: &Post,
+        post: &Announcement,
     ) -> Result<mongodb::results::InsertOneResult, mongodb::error::Error> {
         self.posts().insert_one(post, None).await
     }

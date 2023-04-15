@@ -13,7 +13,7 @@ pub struct InformationPage {
     pub content_node: NodeRef,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InformationExtra {
     pub icon: Option<Icon>
 }

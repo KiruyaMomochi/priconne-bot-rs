@@ -20,8 +20,9 @@ use crate::{
     insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
     message::{ChatManager, Sendable},
     resource::{
-        announcement::{Announcement, AnnouncementResource},
+        announcement::{sources::AnnouncementSource, Announcement, AnnouncementResource},
         cartoon::Thumbnail,
+        information::Announce,
         Resource, ResourceMetadata,
     },
     service::resource::ResourceResponse,
@@ -37,123 +38,26 @@ use self::{
     resource::{MemorizedResourceClient, ResourceClient, SendableResourceClient},
 };
 
-pub trait ServiceBuilder {
-    type Metadata: ResourceMetadata;
-    type CollectionService: ResourceCollectionService<Self::Metadata>;
-    type Service: ResourceService<Self::Metadata>;
-    fn build_collection_service(&self, priconne: &PriconneService) -> Self::CollectionService;
-    fn build_service(&self, priconne: &PriconneService) -> Self::Service;
-}
+// pub trait ServiceBuilder {
+//     type Metadata: ResourceMetadata;
+//     type CollectionService: ResourceCollectionService<Self::Metadata>;
+//     type Service: ResourceService<Self::Metadata>;
+//     fn build_collection_service(&self, priconne: &PriconneService) -> Self::CollectionService;
+//     fn build_service(&self, priconne: &PriconneService) -> Self::Service;
+// }
 
 #[async_trait]
-pub trait ResourceCollectionService<M: ResourceMetadata> {
+pub trait ResourceService<M> {
     /// Collect latest metadata
-    async fn collect_latests(&self, priconne: &PriconneService) -> Vec<M>;
+    async fn collect_latests(&self, priconne: &PriconneService) -> Result<Vec<M>, Error>;
+    /// For any given metadata, extract data from it
+    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
 }
 
 #[async_trait]
-pub trait ResourceService<M: ResourceMetadata> {
-    /// For any given metadata, extract data from it
-    async fn extract_data(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
-}
-
-/// Resource fetch strategy.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FetchStrategy {
-    /// Stop fetch when continuous posted count is greater than this value.
-    pub fuse_limit: Option<i32>,
-    /// Minimum post id.
-    pub ignore_id_lt: Option<i32>,
-    /// Minimum update time,
-    pub ignore_time_lt: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-impl FetchStrategy {
-    pub fn build(&self) -> FetchState<i32> {
-        FetchState::new(self.clone())
-    }
-    pub fn override_by(self, rhs: &Self) -> Self {
-        Self {
-            fuse_limit: rhs.fuse_limit.or(self.fuse_limit),
-            ignore_id_lt: rhs.ignore_id_lt.or(self.ignore_id_lt),
-            ignore_time_lt: rhs.ignore_time_lt.or(self.ignore_time_lt),
-        }
-    }
-}
-
-impl FetchStrategy {
-    pub const DEFAULT: Self = Self {
-        fuse_limit: Some(1),
-        ignore_id_lt: None,
-        ignore_time_lt: None,
-    };
-}
-
-impl Default for FetchStrategy {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FetchState<I> {
-    pub strategy: FetchStrategy,
-    pub fuse_count: I,
-}
-
-impl FetchState<i32> {
-    pub fn new(strategy: FetchStrategy) -> Self {
-        Self {
-            strategy,
-            fuse_count: 0,
-        }
-    }
-
-    pub fn keep_going<R: ResourceMetadata>(&mut self, resource: &R, is_update: bool) -> bool {
-        let id = resource.id();
-        let update_time = resource.update_time();
-
-        let mut keep_going = true;
-        if let Some(ignore_id_lt) = self.strategy.ignore_id_lt {
-            if id < ignore_id_lt {
-                keep_going = false;
-            }
-        }
-        if let Some(ignore_time_lt) = self.strategy.ignore_time_lt {
-            if update_time < ignore_time_lt {
-                keep_going = false;
-            }
-        }
-        if self.strategy.fuse_limit.is_none() {
-            return keep_going;
-        }
-
-        if !is_update {
-            self.fuse_count += 1;
-        }
-        if keep_going {
-            self.fuse_count = 0;
-        } else {
-            self.fuse_count += 1;
-        }
-
-        let result = self.fuse_count < self.strategy.fuse_limit.unwrap_or(0);
-        tracing::debug!(
-            "id: {}/{:?}, fuse: {}/{:?}",
-            id,
-            self.strategy.ignore_id_lt,
-            self.fuse_count,
-            self.strategy.fuse_limit
-        );
-        result
-    }
-
-    pub fn should_fetch(&self) -> bool {
-        match self.strategy.fuse_limit {
-            Some(fuse_limit) => self.fuse_count < fuse_limit,
-            None => true,
-        }
-    }
+pub trait AnnouncementService<M> {
+    async fn create_decision(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
+    async fn fetch_response(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
 }
 
 /// Central service for Priconne resource management.
@@ -171,7 +75,6 @@ impl FetchState<i32> {
 /// ```
 pub struct PriconneService {
     pub database: mongodb::Database,
-    pub announcement_collection: AnnouncementCollection,
     pub telegraph: telegraph_rs::Telegraph,
 
     pub client: reqwest::Client,
@@ -188,15 +91,12 @@ impl PriconneService {
         client: reqwest::Client,
         config: FetchConfig,
     ) -> Result<PriconneService, Error> {
-        let announcement_collection = AnnouncementCollection(database.collection("announcements"));
-
         let extractor = Extractor {
             tagger: RegexTagger { tag_rules: vec![] },
         };
 
         Ok(Self {
             database,
-            announcement_collection,
             chat_manager,
             extractor,
             telegraph,
@@ -205,88 +105,85 @@ impl PriconneService {
         })
     }
 
-    pub async fn serve_and_work(&self, builder: impl ServiceBuilder) -> Result<(), Error> {
-        let latests = builder
-            .build_collection_service(self)
-            .collect_latests(self)
-            .await;
+    pub async fn serve_and_work<M>(&self, service: impl ResourceService<M>) -> Result<(), Error> {
+        let latests = service.collect_latests(self).await;
 
-        for result in latests {
-            let service = builder.build_service(self);
-            service.extract_data(self, result).await?;
+        for result in latests? {
+            service.work(self, result).await?;
         }
         Ok(())
     }
 
-    pub async fn serve_announcements<R: AnnouncementResource>(
-        &self,
-        announcement: R,
-    ) -> Result<(), Error>
-    where
-        // we need it to make rust-analyzer happy
-        // see [Add support for trait aliases](https://github.com/rust-lang/rust-analyzer/issues/2773)
-        // for more details
-        R: Announcement + Resource,
-    {
-        let source = announcement.source();
+    // pub async fn serve_announcements<R: AnnouncementResource>(
+    //     &self,
+    //     announcement: R,
+    // ) -> Result<(), Error>
+    // where
+    //     // we need it to make rust-analyzer happy
+    //     // see [Add support for trait aliases](https://github.com/rust-lang/rust-analyzer/issues/2773)
+    //     // for more details
+    //     R: Announcement + Resource,
+    // {
+    //     let source = announcement.source();
 
-        // Step 1: Fetch from memorized resources
-        let service = announcement.build_service(self);
-        let results = service.latests().await.unwrap();
+    //     // Step 1: Fetch from memorized resources
+    //     let service: MemorizedResourceClient<<R as Resource>::Metadata, <R as Resource>::Client> =
+    //         announcement.build_service(self);
+    //     let results = service.latests().await.unwrap();
 
-        for result in results {
-            // Step 2: Work on each resource
-            let announcement = self
-                .announcement_collection
-                .find_resource(result.item(), &source)
-                .await?;
-            let decision = AnnouncementDecision::new(source.clone(), result, announcement);
-            self.work_announcement(&service.client, decision).await?;
-        }
+    //     for result in results {
+    //         // Step 2: Work on each resource
+    //         let announcement = self
+    //             .announcement_collection
+    //             .find_resource(result.item(), &source)
+    //             .await?;
+    //         let decision = AnnouncementDecision::new(source.clone(), result, announcement);
+    //         self.work_announcement(&service.client, decision).await?;
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    /// Add a new information resource to post collection, extract data and send if needed
-    /// This is the main entry point of the service
-    pub async fn work_announcement<M, C>(
-        &self,
-        client: &C,
-        mut desicion: AnnouncementDecision<M>,
-    ) -> Result<(), Error>
-    where
-        M: ResourceMetadata,
-        C: AnnouncementClient<M>,
-    {
-        let Some(metadata) = desicion.should_request() else {return Ok(());};
+    // /// Add a new information resource to post collection, extract data and send if needed
+    // /// This is the main entry point of the service
+    // pub async fn work_announcement<M, C>(
+    //     &self,
+    //     client: &C,
+    //     mut desicion: AnnouncementDecision<M>,
+    // ) -> Result<(), Error>
+    // where
+    //     M: ResourceMetadata,
+    //     C: AnnouncementClient<M>,
+    // {
+    //     let Some(metadata) = desicion.should_request() else {return Ok(());};
 
-        // ask client to get full article
-        // maybe other things like thumbnail for cartoon, todo
-        let response = client.fetch(metadata).await?;
+    //     // ask client to get full article
+    //     // maybe other things like thumbnail for cartoon, todo
+    //     let response = client.fetch(metadata).await?;
 
-        // extract data
-        // TODO: telegraph patch in utils
-        let mut data = self.extractor.extract_announcement(&response);
-        let extra = serde_json::to_string_pretty(&data.extra)?;
-        if let Some(content) = response.telegraph_content(Some(extra))? {
-            let telegraph = self
-                .telegraph
-                .create_page(&data.title, &content, false)
-                .await?;
-            data.telegraph_url = Some(telegraph.url);
-        }
+    //     // extract data
+    //     // TODO: telegraph patch in utils
+    //     let mut data = self.extractor.extract_announcement(&response);
+    //     let extra = serde_json::to_string_pretty(&data.extra)?;
+    //     if let Some(content) = response.telegraph_content(Some(extra))? {
+    //         let telegraph = self
+    //             .telegraph
+    //             .create_page(&data.title, &content, false)
+    //             .await?;
+    //         data.telegraph_url = Some(telegraph.url);
+    //     }
 
-        trace!("{data:?}");
-        if let Some(announcement) = desicion.update_announcement(data) {
-            self.announcement_collection.upsert(&announcement).await?;
-        };
+    //     trace!("{data:?}");
+    //     if let Some(announcement) = desicion.update_announcement(data) {
+    //         self.announcement_collection.upsert(&announcement).await?;
+    //     };
 
-        if let Some(announcement) = desicion.send_post_and_continue() {
-            self.chat_manager.send_post(announcement).await;
-        };
+    //     if let Some(announcement) = desicion.send_post_and_continue() {
+    //         self.chat_manager.send_post(announcement).await;
+    //     };
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub async fn serve_cartoons<R: Resource<Metadata = Thumbnail>>(
         &self,

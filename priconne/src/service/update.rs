@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::debug;
 
 use crate::{
-    database::{Post, AnnouncementCollection},
+    database::{Announcement, AnnouncementCollection},
     insight::AnnouncementInsight,
     resource::{announcement::sources::AnnouncementSource, ResourceMetadata},
 };
@@ -66,7 +66,7 @@ pub struct AnnouncementDecision<R: ResourceMetadata> {
     /// Item in database before fetch
     pub resource: MetadataFindResult<R>,
     /// Post item
-    pub announcement: Option<Post>,
+    pub announcement: Option<Announcement>,
 }
 
 /// Action to take
@@ -90,7 +90,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
         }
     }
 
-    pub fn update_announcement<E>(&mut self, data: AnnouncementInsight<E>) -> Option<&Post>
+    pub fn update_announcement<E>(&mut self, data: AnnouncementInsight<E>) -> Option<&Announcement>
     where
         E: Serialize + DeserializeOwned,
     {
@@ -98,7 +98,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
         self.announcement.as_ref()
     }
 
-    pub fn send_post_and_continue(&self) -> Option<&Post> {
+    pub fn send_post_and_continue(&self) -> Option<&Announcement> {
         match self.action {
             Action::Send => self.announcement.as_ref(),
             _ => None,
@@ -108,7 +108,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
 
 /// TODO: random write, may all wrong
 impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
-    pub fn new(source: AnnouncementSource, find_result: MetadataFindResult<R>, announcement: Option<Post>) -> Self {
+    pub fn new(source: AnnouncementSource, find_result: MetadataFindResult<R>, announcement: Option<Announcement>) -> Self {
         Self {
             action: Self::get_action(&source, &find_result, &announcement),
             source,
@@ -120,7 +120,7 @@ impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
     fn get_action(
         source: &AnnouncementSource,
         resource: &MetadataFindResult<R>,
-        post: &Option<Post>,
+        post: &Option<Announcement>,
     ) -> Action {
         let resource = resource.item();
         if post.is_none() {

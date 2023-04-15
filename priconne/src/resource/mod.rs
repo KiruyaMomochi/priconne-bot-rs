@@ -1,27 +1,23 @@
 pub mod announcement;
-pub mod article;
 pub mod cartoon;
 pub mod glossary;
+pub use announcement::*;
 
 use crate::{
     insight::AnnouncementPage,
     service::{
-        resource::{ResourceClient, MemorizedResourceClient},
+        resource::{MemorizedResourceClient, ResourceClient},
         PriconneService,
     },
     utils::HOUR,
 };
-pub use article::*;
 use chrono::{DateTime, FixedOffset, Utc};
 use reqwest::{Client, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use self::{
-    announcement::{sources::AnnouncementSource, AnnouncementResponse, Announcement},
-    cartoon::Thumbnail,
-    information::Announce,
-    news::News,
-};
+use information::Announce;
+use news::News;
+use cartoon::Thumbnail;
 use regex::Regex;
 
 /// Resource is assets in Priconne world, this can be an announcement or a cartoon page

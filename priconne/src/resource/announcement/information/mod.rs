@@ -1,5 +1,93 @@
 mod page;
+use async_trait::async_trait;
 pub use page::*;
+use tracing::trace;
+
+use crate::{
+    database::AnnouncementCollection,
+    service::{
+        api::ApiClient,
+        resource::{MemorizedResourceClient, ResourceClient, ResourceResponse},
+        update::{AnnouncementDecision, MetadataFindResult},
+        PriconneService, ResourceService,
+    },
+    Error, insight::Extractor,
+};
+
+use super::sources::AnnouncementSource;
+
+pub struct ApiAnnouncement {
+    client: MemorizedResourceClient<Announce, ApiClient>,
+    extractor: Extractor,
+    source: AnnouncementSource,
+    announcement_collection: AnnouncementCollection,
+}
+
+#[async_trait]
+impl ResourceService<MetadataFindResult<Announce>> for ApiAnnouncement {
+    /// Collect latest metadata
+    async fn collect_latests(
+        &self,
+        priconne: &PriconneService,
+    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
+        self.client.latests().await
+    }
+
+    /// Add a new information resource to post collection, extract data and send if needed
+    /// This is the main entry point of the service
+    async fn work(
+        &self,
+        priconne: &PriconneService,
+        metadata: MetadataFindResult<Announce>,
+    ) -> Result<(), Error> {
+        let source = self.source;
+
+        let announcement = self
+            .announcement_collection
+            .find_resource(metadata.item(), &source)
+            .await?;
+
+        let decision = AnnouncementDecision::new(source.clone(), metadata, announcement);
+
+        let Some(metadata) = decision.should_request() else {return Ok(());};
+        let extractor = priconne.extractor.clone();
+
+        // ask client to get full article
+        // maybe other things like thumbnail for cartoon, todo
+        let (mut data, content) = {
+            let response = self.client.fetch(metadata).await?;
+            let data = extractor.extract_announcement(&response);
+            let extra = Some(serde_json::to_string_pretty(&data.extra)?);
+
+            (
+                data,
+                response.telegraph_content(extra)?,
+            )
+        };
+
+        // extract data
+        // TODO: telegraph patch in utils
+        let title = data.title;
+
+        let telegraph = priconne
+            .telegraph
+            .create_page(&title, &content.unwrap(), false)
+            .await?;
+
+        // data.telegraph_url = Some(telegraph.url);
+
+        // trace!("{data:?}");
+        // if let Some(announcement) = decision.update_announcement(data) {
+        //     self.announcement_collection.upsert(&announcement).await?;
+        // };
+
+        // if let Some(announcement) = decision.send_post_and_continue() {
+        //     priconne.chat_manager.send_post(announcement).await;
+        // };
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -110,7 +110,7 @@ impl ResourceClient<News> for NewsClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::{resource::MemorizedResourceClient, news::NewsClient, FetchStrategy};
+    use crate::service::{resource::{MemorizedResourceClient, FetchStrategy}, news::NewsClient};
     use reqwest::Url;
 
     #[tokio::test]

@@ -40,7 +40,7 @@ impl<E> PostData<E> {
 // This will finally replaces `SentMessage`.
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Post {
+pub struct Announcement {
     /// Post ID.
     /// Can generate by `bson::oid::ObjectId::new()`.
     #[serde(rename = "_id")]
@@ -82,7 +82,7 @@ where
     )
 }
 
-impl Post {
+impl Announcement {
     pub fn new<E>(data: AnnouncementInsight<E>) -> Self
     where
         E: Serialize + DeserializeOwned,
@@ -111,7 +111,7 @@ impl Post {
 }
 
 impl PostData<bson::Bson> {
-    pub fn build_message(&self, post: &Post) -> String {
+    pub fn build_message(&self, post: &Announcement) -> String {
         // let (title, tags) = tags(&page, &self.tagger);
         let link = self.telegraph_url.as_ref().map_or("#NOURL", |s| s.as_str());
         let id = self.id;
@@ -166,7 +166,7 @@ impl PostData<bson::Bson> {
     }
 }
 
-impl Sendable for Post {
+impl Sendable for Announcement {
     fn message(&self) -> crate::message::Message {
         let data = self.data.last().unwrap();
         let text = data.build_message(self);

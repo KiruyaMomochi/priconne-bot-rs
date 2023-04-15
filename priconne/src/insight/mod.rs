@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::{
-    database::Post,
+    database::Announcement,
     resource::announcement::{sources::AnnouncementSource, AnnouncementResponse},
 };
 
@@ -43,16 +43,17 @@ impl<E> AnnouncementInsight<E>
 where
     E: Serialize + DeserializeOwned,
 {
-    pub fn push_inplace(self, post: &mut Option<Post>) {
+    pub fn push_inplace(self, post: &mut Option<Announcement>) {
         match post.as_mut() {
             Some(post) => {
                 post.push(self);
             }
-            None => *post = Some(Post::new(self)),
+            None => *post = Some(Announcement::new(self)),
         };
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Extractor {
     pub tagger: RegexTagger,
 }

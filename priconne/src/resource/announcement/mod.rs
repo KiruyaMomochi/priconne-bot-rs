@@ -1,7 +1,10 @@
+pub mod information;
+pub mod news;
+
 use crate::{
     insight::{AnnouncementInsight, AnnouncementPage},
     message::{Message, Sendable},
-    service::{resource::ResourceResponse, announcement::AnnouncementClient},
+    service::{announcement::AnnouncementClient, resource::ResourceResponse},
 };
 
 use mongodb::bson;
@@ -21,7 +24,6 @@ pub trait AnnouncementResource = Announcement + Resource
 where
     <Self as Resource>::Client:
         AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
-
 
 pub mod sources {
     use super::*;

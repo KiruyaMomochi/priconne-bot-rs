@@ -6,7 +6,7 @@ use futures::{
 };
 use mongodb::{bson::doc, options::FindOneAndReplaceOptions, Collection};
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Serialize, Deserialize};
 
 use crate::{
     insight::AnnouncementPage,
@@ -15,7 +15,7 @@ use crate::{
     Error,
 };
 
-use super::{update::MetadataFindResult, FetchStrategy};
+use super::{update::MetadataFindResult};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
@@ -37,7 +37,6 @@ pub trait SendableResourceClient<M> = ResourceClient<M>
 where
     <Self as ResourceClient<M>>::Response: Sendable,
     M: ResourceMetadata;
-
 
 /// Wrapped `ResourceClient` that memorizes the fetched resource metadata.
 pub struct MemorizedResourceClient<M, Client>
@@ -144,6 +143,104 @@ where
     }
 }
 
+/// Resource fetch strategy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FetchStrategy {
+    /// Stop fetch when continuous posted count is greater than this value.
+    pub fuse_limit: Option<i32>,
+    /// Minimum post id.
+    pub ignore_id_lt: Option<i32>,
+    /// Minimum update time,
+    pub ignore_time_lt: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl FetchStrategy {
+    pub fn build(&self) -> FetchState<i32> {
+        FetchState::new(self.clone())
+    }
+    pub fn override_by(self, rhs: &Self) -> Self {
+        Self {
+            fuse_limit: rhs.fuse_limit.or(self.fuse_limit),
+            ignore_id_lt: rhs.ignore_id_lt.or(self.ignore_id_lt),
+            ignore_time_lt: rhs.ignore_time_lt.or(self.ignore_time_lt),
+        }
+    }
+}
+
+impl FetchStrategy {
+    pub const DEFAULT: Self = Self {
+        fuse_limit: Some(1),
+        ignore_id_lt: None,
+        ignore_time_lt: None,
+    };
+}
+
+impl Default for FetchStrategy {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FetchState<I> {
+    pub strategy: FetchStrategy,
+    pub fuse_count: I,
+}
+
+impl FetchState<i32> {
+    pub fn new(strategy: FetchStrategy) -> Self {
+        Self {
+            strategy,
+            fuse_count: 0,
+        }
+    }
+
+    pub fn keep_going<R: ResourceMetadata>(&mut self, resource: &R, is_update: bool) -> bool {
+        let id = resource.id();
+        let update_time = resource.update_time();
+
+        let mut keep_going = true;
+        if let Some(ignore_id_lt) = self.strategy.ignore_id_lt {
+            if id < ignore_id_lt {
+                keep_going = false;
+            }
+        }
+        if let Some(ignore_time_lt) = self.strategy.ignore_time_lt {
+            if update_time < ignore_time_lt {
+                keep_going = false;
+            }
+        }
+        if self.strategy.fuse_limit.is_none() {
+            return keep_going;
+        }
+
+        if !is_update {
+            self.fuse_count += 1;
+        }
+        if keep_going {
+            self.fuse_count = 0;
+        } else {
+            self.fuse_count += 1;
+        }
+
+        let result = self.fuse_count < self.strategy.fuse_limit.unwrap_or(0);
+        tracing::debug!(
+            "id: {}/{:?}, fuse: {}/{:?}",
+            id,
+            self.strategy.ignore_id_lt,
+            self.fuse_count,
+            self.strategy.fuse_limit
+        );
+        result
+    }
+
+    pub fn should_fetch(&self) -> bool {
+        match self.strategy.fuse_limit {
+            Some(fuse_limit) => self.fuse_count < fuse_limit,
+            None => true,
+        }
+    }
+}
 
 pub struct ResourceMetadataCollection<R: ResourceMetadata>(Collection<R>);
 
