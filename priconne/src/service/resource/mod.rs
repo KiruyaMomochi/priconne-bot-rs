@@ -1,3 +1,6 @@
+pub mod announcement;
+pub mod news;
+
 use async_trait::async_trait;
 use futures::{
     future::{self},
@@ -11,10 +14,8 @@ use serde::{Serialize, Deserialize};
 use crate::{
     message::Sendable,
     resource::{ResourceMetadata},
-    Error,
+    Error, database::ResourceMetadataCollection,
 };
-
-use super::{update::MetadataFindResult};
 
 /// `ResourceClient` is a client fetching and parsing resources.
 #[async_trait]
@@ -241,39 +242,6 @@ impl FetchState<i32> {
     }
 }
 
-pub struct ResourceMetadataCollection<R: ResourceMetadata>(Collection<R>);
-
-impl<R> ResourceMetadataCollection<R>
-where
-    R: ResourceMetadata,
-{
-    pub fn new(collection: Collection<R>) -> Self {
-        Self(collection)
-    }
-
-    fn inner(&self) -> &Collection<R> {
-        &self.0
-    }
-
-    pub async fn find(&self, resource: &R) -> Result<Option<R>, mongodb::error::Error> {
-        self.find_by_id(&resource.id()).await
-    }
-
-    pub async fn find_by_id(&self, id: &i32) -> Result<Option<R>, mongodb::error::Error> {
-        self.inner().find_one(doc! { "_id": id }, None).await
-    }
-
-    pub async fn upsert(&self, resource: &R) -> Result<Option<R>, mongodb::error::Error> {
-        self.inner()
-            .find_one_and_replace(
-                doc! { "_id": resource.id() },
-                resource,
-                FindOneAndReplaceOptions::builder().upsert(true).build(),
-            )
-            .await
-    }
-}
-
 pub trait ResourceResponse {
     fn telegraph_content(&self, _extra: Option<String>) -> Result<Option<String>, crate::Error> {
         Ok(None)
@@ -281,3 +249,51 @@ pub trait ResourceResponse {
 }
 
 impl ResourceResponse for crate::resource::cartoon::CartoonPage {}
+
+
+#[derive(Debug)]
+pub struct MetadataFindResult<R: ResourceMetadata> {
+    /// this is new
+    inner: R,
+    /// this is a update to a existing item
+    old: Option<R>,
+    /// this is same as the one in database,
+    is_same: bool,
+}
+
+impl<R: ResourceMetadata> MetadataFindResult<R> {
+    pub fn from_new(inner: R) -> Self {
+        Self {
+            inner,
+            old: None,
+            is_same: false,
+        }
+    }
+    pub fn from_found(inner: R, old: R) -> Self {
+        Self {
+            is_same: !inner.is_update(&old),
+            inner,
+            old: Some(old),
+        }
+    }
+
+    pub fn item(&self) -> &R {
+        &self.inner
+    }
+
+    pub fn is_new(&self) -> bool {
+        self.old.is_none()
+    }
+
+    pub fn is_update(&self) -> bool {
+        !self.is_same && self.old.is_some()
+    }
+
+    pub fn is_same(&self) -> bool {
+        self.is_same
+    }
+
+    pub fn is_not_same(&self) -> bool {
+        !self.is_same
+    }
+}

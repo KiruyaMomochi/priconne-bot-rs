@@ -1,12 +1,12 @@
-mod post;
-pub use post::Announcement;
+use mongodb::{
+    bson::doc,
+    options::{FindOneAndReplaceOptions, FindOneOptions},
+    Collection,
+};
 
-use mongodb::{bson::doc, options::FindOneOptions, Collection};
-use regex::Regex;
-
-use crate::resource::{
-    announcement::sources::AnnouncementSource,
-    ResourceMetadata,
+use crate::{
+    resource::{announcement::sources::AnnouncementSource, Announcement, ResourceMetadata},
+    utils::map_title,
 };
 
 pub struct AnnouncementCollection(pub Collection<Announcement>);
@@ -76,13 +76,37 @@ impl AnnouncementCollection {
     }
 }
 
-/// Create mapped title that not changeed by square bracket or update information.
-pub fn map_title(title: &str) -> String {
-    let title = title.trim();
-    let regex = Regex::new(r#"^\s*(【.+?】)?\s*(.+?)\s*(\(.+更新\))?\s*$"#).unwrap();
-    let title = regex.replace(title, "$2");
+pub struct ResourceMetadataCollection<R: ResourceMetadata>(Collection<R>);
 
-    title.to_string()
+impl<R> ResourceMetadataCollection<R>
+where
+    R: ResourceMetadata,
+{
+    pub fn new(collection: Collection<R>) -> Self {
+        Self(collection)
+    }
+
+    fn inner(&self) -> &Collection<R> {
+        &self.0
+    }
+
+    pub async fn find(&self, resource: &R) -> Result<Option<R>, mongodb::error::Error> {
+        self.find_by_id(&resource.id()).await
+    }
+
+    pub async fn find_by_id(&self, id: &i32) -> Result<Option<R>, mongodb::error::Error> {
+        self.inner().find_one(doc! { "_id": id }, None).await
+    }
+
+    pub async fn upsert(&self, resource: &R) -> Result<Option<R>, mongodb::error::Error> {
+        self.inner()
+            .find_one_and_replace(
+                doc! { "_id": resource.id() },
+                resource,
+                FindOneAndReplaceOptions::builder().upsert(true).build(),
+            )
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -94,21 +118,5 @@ pub mod tests {
             mongodb::Client::with_uri_str("mongodb://root:example@localhost:27017").await?;
         let db = client.database("test_only_delete_me");
         db.drop(None).await.map(|()| db)
-    }
-
-    #[test]
-    fn test_map_titie() {
-        assert_eq!(
-            map_title("「消耗體力時」主角EXP獲得量1.5倍活動！"),
-            "「消耗體力時」主角EXP獲得量1.5倍活動！"
-        );
-        assert_eq!(
-            map_title("【活動】【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"),
-            "【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"
-        );
-        assert_eq!(
-            map_title("【活動】「消耗體力時」主角EXP獲得量1.5倍活動！(1/1更新)"),
-            "「消耗體力時」主角EXP獲得量1.5倍活動！"
-        );
     }
 }

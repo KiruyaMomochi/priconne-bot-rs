@@ -9,6 +9,7 @@ pub mod resource;
 pub mod insight;
 pub mod message;
 pub mod service;
+pub mod config;
 
 pub use error::Error;
 pub use page::Page;

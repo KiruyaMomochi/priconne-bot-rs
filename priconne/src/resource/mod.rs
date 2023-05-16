@@ -4,7 +4,6 @@ pub mod glossary;
 pub use announcement::*;
 
 use crate::{
-    insight::AnnouncementPage,
     service::{
         resource::{MemorizedResourceClient, ResourceClient},
         PriconneService,
@@ -19,6 +18,15 @@ use information::Announce;
 use news::News;
 use cartoon::Thumbnail;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Region {
+    JP,
+    EN,
+    TW,
+    CN,
+    KR,
+    TH,
+}
 
 /// Resource is assets in Priconne world, this can be an announcement or a cartoon page
 pub trait Resource {

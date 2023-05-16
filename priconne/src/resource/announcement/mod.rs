@@ -2,27 +2,84 @@ pub mod information;
 pub mod news;
 
 use crate::{
-    insight::{AnnouncementPage},
-    service::{announcement::AnnouncementClient, resource::ResourceResponse},
+    insight::{AnnouncementPage, Tags, EventPeriod, AnnouncementInsight},
+    service::resource::ResourceResponse, utils::map_title, message::Sendable,
 };
 
+use chrono::{DateTime, Utc};
 use mongodb::bson;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_with::serde_as;
 
+use super::{Resource, Region};
 
-use self::sources::AnnouncementSource;
-
-use super::Resource;
-
-pub trait Announcement {
-    type Page: AnnouncementPage;
-    fn source(&self) -> AnnouncementSource;
+// This will finally replaces `SentMessage`.
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Announcement {
+    /// Post ID.
+    /// Can generate by `bson::oid::ObjectId::new()`.
+    #[serde(rename = "_id")]
+    pub id: bson::oid::ObjectId,
+    /// Mapped title for matching.
+    pub mapped_title: String,
+    /// Region of the post.
+    pub region: Region,
+    /// Events of post, will update when new data received.
+    /// They are [embedded], sicne the number is small.
+    ///
+    /// [embedded]: https://www.mongodb.com/docs/manual/tutorial/model-embedded-one-to-many-relationships-between-documents/
+    pub events: Vec<EventPeriod>,
+    /// History post ID.
+    pub history: Option<bson::oid::ObjectId>,
+    /// Latest version
+    pub latest_version: usize,
+    /// Data in this announcement
+    pub data: Vec<AnnouncementInsight<bson::Bson>>,
 }
 
-pub trait AnnouncementResource = Announcement + Resource
-where
-    <Self as Resource>::Client:
-        AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
+impl Announcement {
+    pub fn new<E>(insight: AnnouncementInsight<E>, events: Vec<EventPeriod>) -> Self
+    where
+        E: Serialize + DeserializeOwned,
+    {
+        Self {
+            id: bson::oid::ObjectId::new(),
+            mapped_title: map_title(&insight.title),
+            region: Region::TW,
+            history: None,
+            latest_version: 0,
+            data: vec![insight.into_bson()],
+            events,
+        }
+    }
+
+    pub fn push<E>(&mut self, insight: AnnouncementInsight<E>, events: Vec<EventPeriod>)
+    where
+        E: Serialize + DeserializeOwned,
+    {
+        self.data.push(insight.into_bson());
+        self.events = events;
+    }
+}
+
+impl Sendable for Announcement {
+    fn message(&self) -> crate::message::Message {
+        let data = self.data.last().unwrap();
+        let text = data.build_message(self);
+
+        crate::message::Message {
+            silent: false,
+            text,
+            image_src: None,
+        }
+    }
+}
+
+// pub trait AnnouncementResource = Announcement + Resource
+// where
+//     <Self as Resource>::Client:
+//         AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
 
 pub mod sources {
     use super::*;
@@ -57,15 +114,12 @@ pub mod sources {
 
 pub struct AnnouncementResponse<T: AnnouncementPage> {
     pub post_id: i32,
-    pub source: AnnouncementSource,
+    pub source: sources::AnnouncementSource,
     pub url: url::Url,
     pub page: T,
 }
 
-impl<T> ResourceResponse for AnnouncementResponse<T>
-where
-    T: crate::insight::AnnouncementPage,
-{
+impl<T: AnnouncementPage> ResourceResponse for AnnouncementResponse<T> {
     fn telegraph_content(&self, extra: Option<String>) -> Result<Option<String>, crate::Error> {
         let content_node = self.page.content();
 

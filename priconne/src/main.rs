@@ -1,7 +1,3 @@
-
-
-
-
 use priconne::{built_info, service::api::ApiServer};
 use reqwest::Url;
 

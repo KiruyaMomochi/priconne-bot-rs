@@ -13,7 +13,7 @@ pub struct EventPeriod {
 }
 
 fn parse_period(period_str: &str) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
-    let offset = FixedOffset::east(8 * HOUR);
+    let offset = FixedOffset::east_opt(8 * HOUR).unwrap();
     // 2021/12/27 05:00
     let fmt = "%Y/%m/%d %H:%M";
 

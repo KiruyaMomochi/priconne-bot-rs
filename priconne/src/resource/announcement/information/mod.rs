@@ -1,89 +1,36 @@
 mod page;
 use async_trait::async_trait;
 pub use page::*;
-use tracing::trace;
 
 use crate::{
-    database::AnnouncementCollection,
-    insight::Extractor,
     service::{
         api::ApiClient,
-        resource::{MemorizedResourceClient, ResourceClient, ResourceResponse},
-        update::{AnnouncementDecision, MetadataFindResult},
-        PriconneService, ResourceService,
+        resource::{MemorizedResourceClient, MetadataFindResult, ResourceClient},
+        AnnouncementService,
     },
     Error,
 };
 
-use super::sources::AnnouncementSource;
+use super::{sources::AnnouncementSource, AnnouncementResponse};
 
-pub struct ApiAnnouncement {
-    client: MemorizedResourceClient<Announce, ApiClient>,
-    source: AnnouncementSource,
-
-    announcement_collection: AnnouncementCollection,
-    telegraph: telegraph_rs::Telegraph,
-    extractor: Extractor,
-}
 
 #[async_trait]
-impl ResourceService<MetadataFindResult<Announce>> for ApiAnnouncement {
-    /// Collect latest metadata
-    async fn collect_latests(
-        &self,
-        _priconne: &PriconneService,
-    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
-        self.client.latests().await
+impl AnnouncementService<Announce> for MemorizedResourceClient<Announce, ApiClient> {
+    type Page = InformationPage;
+
+    fn source(&self) -> AnnouncementSource {
+        AnnouncementSource::Api(self.client.api_server.id.clone())
     }
-
-    /// Add a new information resource to post collection, extract data and send if needed
-    /// This is the main entry point of the service
-    async fn work(
+    async fn collect_latest_announcements(
         &self,
-        priconne: &PriconneService,
-        metadata: MetadataFindResult<Announce>,
-    ) -> Result<(), Error> {
-        let source = self.source.clone();
-
-        let announcement = self
-            .announcement_collection
-            .find_resource(metadata.item(), &source)
-            .await?;
-
-        let mut decision = AnnouncementDecision::new(source.clone(), metadata, announcement);
-
-        let Some(metadata) = decision.should_request() else {return Ok(());};
-
-        // ask client to get full article
-        // maybe other things like thumbnail for cartoon, todo
-        let (mut data, content) = {
-            let extractor = self.extractor.clone();
-            let response = self.client.fetch(metadata).await?;
-            let data = extractor.extract_announcement(&response);
-            let extra = Some(serde_json::to_string_pretty(&data.extra)?);
-
-            (data, response.telegraph_content(extra)?)
-        };
-
-        // extract data
-        // TODO: telegraph patch in utils
-        let telegraph = self
-            .telegraph
-            .create_page(&data.title, &content.unwrap(), false)
-            .await?;
-
-        data.telegraph_url = Some(telegraph.url);
-
-        trace!("{data:?}");
-        if let Some(announcement) = decision.update_announcement(data) {
-            self.announcement_collection.upsert(announcement).await?;
-        };
-
-        if let Some(announcement) = decision.send_post_and_continue() {
-            priconne.chat_manager.send_post(announcement).await;
-        };
-
-        Ok(())
+    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
+        self.latests().await
+    }
+    async fn fetch_response(
+        &self,
+        metadata: &Announce,
+    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
+        self.fetch(metadata).await
     }
 }
 

@@ -9,9 +9,11 @@ use crate::{
         news::{News, NewsList, NewsPage},
         announcement::{sources::AnnouncementSource, AnnouncementResponse},
     },
-    service::resource::ResourceClient,
+    service::{resource::ResourceClient, AnnouncementService},
     Error, Page,
 };
+
+use super::{MemorizedResourceClient, MetadataFindResult};
 
 #[derive(Debug, Clone)]
 pub struct NewsClient {
@@ -77,6 +79,28 @@ impl NewsClient {
     }
 }
 
+
+#[async_trait]
+impl AnnouncementService<News> for MemorizedResourceClient<News, NewsClient> {
+    type Page = NewsPage;
+
+    fn source(&self) -> AnnouncementSource {
+        AnnouncementSource::Website
+    }
+
+    async fn collect_latest_announcements(
+        &self,
+    ) -> Result<Vec<MetadataFindResult<News>>, Error> {
+        self.latests().await
+    }
+    async fn fetch_response(
+        &self,
+        metadata: &News,
+    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
+        self.fetch(metadata).await
+    }
+}
+
 async fn try_next_news_list(
     (href, client): (Option<String>, &NewsClient),
 ) -> Result<Option<(NewsList, (Option<String>, &NewsClient))>, Error> {
@@ -110,8 +134,9 @@ impl ResourceClient<News> for NewsClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::{resource::{MemorizedResourceClient, FetchStrategy}, news::NewsClient};
+    use crate::service::{resource::{MemorizedResourceClient, FetchStrategy}};
     use reqwest::Url;
+    use super::*;
 
     #[tokio::test]
     async fn test_latest_news() -> Result<(), Box<dyn std::error::Error>> {

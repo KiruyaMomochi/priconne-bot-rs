@@ -1,4 +1,5 @@
 use chrono::{DateTime, FixedOffset, TimeZone};
+use regex::Regex;
 use serde::{
     de::{self, Visitor},
     Deserializer,
@@ -188,6 +189,15 @@ pub fn replace_relative_path(
     Ok(())
 }
 
+/// Create mapped title that not changeed by square bracket or update information.
+pub fn map_title(title: &str) -> String {
+    let title = title.trim();
+    let regex = Regex::new(r#"^\s*(【.+?】)?\s*(.+?)\s*(\(.+更新\))?\s*$"#).unwrap();
+    let title = regex.replace(title, "$2");
+
+    title.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,5 +220,21 @@ mod tests {
         let (a, b) = s.split_prefix('a', 'd').unwrap();
         assert_eq!(a, "bc");
         assert_eq!(b, "efg");
+    }
+
+    #[test]
+    fn test_map_titie() {
+        assert_eq!(
+            map_title("「消耗體力時」主角EXP獲得量1.5倍活動！"),
+            "「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
+        assert_eq!(
+            map_title("【活動】【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"),
+            "【喵喵】「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
+        assert_eq!(
+            map_title("【活動】「消耗體力時」主角EXP獲得量1.5倍活動！(1/1更新)"),
+            "「消耗體力時」主角EXP獲得量1.5倍活動！"
+        );
     }
 }

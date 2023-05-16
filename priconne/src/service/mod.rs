@@ -1,34 +1,21 @@
-pub mod announcement;
 pub mod api;
-pub mod config;
-pub mod news;
 pub mod resource;
-pub mod update;
-
-use std::fmt::Debug;
 
 use async_trait::async_trait;
+use tracing::trace;
 
-
-
-use serde::{Deserialize, Serialize};
-
+pub use resource::announcement::AnnouncementService;
 
 use crate::{
     error::Error,
     insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
-    message::{ChatManager},
-    resource::{
-        cartoon::Thumbnail,
-        Resource, ResourceMetadata,
-    },
+    message::ChatManager,
+    resource::{cartoon::Thumbnail, sources::AnnouncementSource, Resource, ResourceMetadata, AnnouncementResponse},
+    service::{resource::ResourceResponse}, database::AnnouncementCollection, config::FetchConfig,
 };
 
-use update::{MetadataFindResult};
-
 use self::{
-    config::{FetchConfig},
-    resource::{ResourceClient, SendableResourceClient},
+    resource::{ResourceClient, SendableResourceClient, MetadataFindResult},
 };
 
 // pub trait ServiceBuilder {
@@ -44,13 +31,7 @@ pub trait ResourceService<M> {
     /// Collect latest metadata
     async fn collect_latests(&self, priconne: &PriconneService) -> Result<Vec<M>, Error>;
     /// For any given metadata, extract data from it
-    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
-}
-
-#[async_trait]
-pub trait AnnouncementService<M> {
-    async fn create_decision(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
-    async fn fetch_response(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>;
+    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error> where M: 'async_trait;
 }
 
 /// Central service for Priconne resource management.
@@ -106,117 +87,6 @@ impl PriconneService {
         }
         Ok(())
     }
-
-    // pub async fn serve_announcements<R: AnnouncementResource>(
-    //     &self,
-    //     announcement: R,
-    // ) -> Result<(), Error>
-    // where
-    //     // we need it to make rust-analyzer happy
-    //     // see [Add support for trait aliases](https://github.com/rust-lang/rust-analyzer/issues/2773)
-    //     // for more details
-    //     R: Announcement + Resource,
-    // {
-    //     let source = announcement.source();
-
-    //     // Step 1: Fetch from memorized resources
-    //     let service: MemorizedResourceClient<<R as Resource>::Metadata, <R as Resource>::Client> =
-    //         announcement.build_service(self);
-    //     let results = service.latests().await.unwrap();
-
-    //     for result in results {
-    //         // Step 2: Work on each resource
-    //         let announcement = self
-    //             .announcement_collection
-    //             .find_resource(result.item(), &source)
-    //             .await?;
-    //         let decision = AnnouncementDecision::new(source.clone(), result, announcement);
-    //         self.work_announcement(&service.client, decision).await?;
-    //     }
-
-    //     Ok(())
-    // }
-
-    // /// Add a new information resource to post collection, extract data and send if needed
-    // /// This is the main entry point of the service
-    // pub async fn work_announcement<M, C>(
-    //     &self,
-    //     client: &C,
-    //     mut desicion: AnnouncementDecision<M>,
-    // ) -> Result<(), Error>
-    // where
-    //     M: ResourceMetadata,
-    //     C: AnnouncementClient<M>,
-    // {
-    //     let Some(metadata) = desicion.should_request() else {return Ok(());};
-
-    //     // ask client to get full article
-    //     // maybe other things like thumbnail for cartoon, todo
-    //     let response = client.fetch(metadata).await?;
-
-    //     // extract data
-    //     // TODO: telegraph patch in utils
-    //     let mut data = self.extractor.extract_announcement(&response);
-    //     let extra = serde_json::to_string_pretty(&data.extra)?;
-    //     if let Some(content) = response.telegraph_content(Some(extra))? {
-    //         let telegraph = self
-    //             .telegraph
-    //             .create_page(&data.title, &content, false)
-    //             .await?;
-    //         data.telegraph_url = Some(telegraph.url);
-    //     }
-
-    //     trace!("{data:?}");
-    //     if let Some(announcement) = desicion.update_announcement(data) {
-    //         self.announcement_collection.upsert(&announcement).await?;
-    //     };
-
-    //     if let Some(announcement) = desicion.send_post_and_continue() {
-    //         self.chat_manager.send_post(announcement).await;
-    //     };
-
-    //     Ok(())
-    // }
-
-    pub async fn serve_cartoons<R: Resource<Metadata = Thumbnail>>(
-        &self,
-        cartoon: R,
-    ) -> Result<(), Error>
-    where
-        R::Client: SendableResourceClient<R::Metadata>,
-    {
-        let service = cartoon.build_service(self);
-        let results = service.latests().await.unwrap();
-
-        for result in results {
-            self.work_cartoon(&service.client, result).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn work_cartoon<C>(
-        &self,
-        client: &C,
-        result: MetadataFindResult<Thumbnail>,
-    ) -> Result<(), Error>
-    where
-        C: SendableResourceClient<Thumbnail> + ResourceClient<Thumbnail>,
-    {
-        let cartoon = client.fetch(result.item()).await?;
-        self.chat_manager.send_post(&cartoon).await;
-        Ok(())
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum Region {
-    JP,
-    EN,
-    TW,
-    CN,
-    KR,
-    TH,
 }
 
 // #[cfg(test)]
