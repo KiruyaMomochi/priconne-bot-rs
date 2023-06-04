@@ -33,3 +33,5 @@ pub enum Error {
     #[error("Source is invalid")]
     InvalidSource
 }
+
+pub type Result<T> = std::result::Result<T, Error>;

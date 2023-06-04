@@ -5,13 +5,16 @@ mod page;
 mod utils;
 
 mod database;
-pub mod resource;
+
+pub mod config;
 pub mod insight;
 pub mod message;
+pub mod client;
 pub mod service;
-pub mod config;
 
-pub use error::Error;
+pub mod resource;
+
+pub use error::{Error, Result};
 pub use page::Page;
 
 // Use of a mod or pub mod is not actually necessary.
@@ -20,13 +23,11 @@ pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-mod client {
-    pub fn ua() -> String {
-        format!(
-            "priconne-bot-rs/{} {} {}",
-            crate::built_info::PKG_VERSION,
-            crate::built_info::TARGET,
-            "Android"
-        )
-    }
+pub fn ua() -> String {
+    format!(
+        "priconne-bot-rs/{} {} {}",
+        crate::built_info::PKG_VERSION,
+        crate::built_info::TARGET,
+        "Android"
+    )
 }

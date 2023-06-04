@@ -1,12 +1,19 @@
+//! Configuration
+//!
+//! This module contains configuration for priconne.
+
 use std::collections::HashMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use teloxide::requests::Requester;
 
 use crate::{
-    insight::{tagging::RegexTagger, Extractor}, message::ChatManager, resource::Resource, service::{resource::FetchStrategy, api::ApiServer, PriconneService},
+    insight::{tagging::RegexTagger, Extractor},
+    message::ChatManager,
+    resource::{Resource, api::ApiServer},
+    service::PriconneService, client::FetchStrategy,
 };
-
 
 /// This is useful for setting values in builder.
 macro_rules! set_some {
@@ -22,7 +29,7 @@ macro_rules! set_some {
 // TODO: In the future we may have some Config traits, but it's an over-engieering for now.
 // Because, we need consider circumstances with async or not, and wrap with result or not...
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PriconneConfig {
     /// Tagging rules
     pub tags: TaggerConfig,
@@ -37,7 +44,7 @@ pub struct PriconneConfig {
     pub fetch: FetchConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FetchConfig {
     /// Url endpoins to fetch resources
     pub server: ServerConfig,
@@ -47,20 +54,20 @@ pub struct FetchConfig {
     pub strategy: StrategyConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct MongoConfig {
     connection_string: String,
     database: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ClientConfig {
     user_agent: Option<String>,
     proxy: Option<String>,
     no_proxy_list: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TelegraphConfig {
     short_name: String,
     access_token: String,
@@ -68,29 +75,30 @@ pub struct TelegraphConfig {
     author_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServerConfig {
     pub news: String,
     pub api: Vec<ApiServer>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StrategyConfig {
     base: FetchStrategy,
     #[serde(flatten)]
     overrides: HashMap<String, FetchStrategy>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct TaggerConfig(HashMap<String, Vec<String>>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TelegramConfig {
     pub webhook_url: Option<String>,
     pub listen_addr: Option<String>,
     pub name: String,
     pub token: String,
+    #[schemars(with = "i64")]
     pub debug_chat: teloxide::types::ChatId,
 }
 
@@ -119,7 +127,8 @@ impl MongoConfig {
 
 impl ClientConfig {
     pub fn build(&self) -> Result<reqwest::Client, crate::Error> {
-        let mut client = reqwest::Client::builder().user_agent(self.user_agent.clone().unwrap_or(crate::client::ua()));
+        let mut client = reqwest::Client::builder()
+            .user_agent(self.user_agent.clone().unwrap_or(crate::ua()));
 
         if let Some(proxy) = self
             .proxy
@@ -204,9 +213,7 @@ impl PriconneConfig {
         let database = self.mongo.build().await?;
         let bot = self.telegram.with_client(client.clone()).await?;
         let tagger = self.tags.build()?;
-        let extractor = Extractor {
-            tagger
-        };
+        let extractor = Extractor { tagger };
 
         Ok(PriconneService {
             database,
@@ -216,8 +223,12 @@ impl PriconneConfig {
             extractor,
             chat_manager: ChatManager {
                 bot,
-                post_recipient: teloxide::types::Recipient::ChannelUsername("@pcrtwstat".to_owned()),
-                cartoon_recipient: teloxide::types::Recipient::ChannelUsername("@pcrtwstat".to_owned()),
+                post_recipient: teloxide::types::Recipient::ChannelUsername(
+                    "@pcrtwstat".to_owned(),
+                ),
+                cartoon_recipient: teloxide::types::Recipient::ChannelUsername(
+                    "@pcrtwstat".to_owned(),
+                ),
             },
         })
     }
@@ -233,7 +244,7 @@ mod tests {
         let config = File::open("tests/config.yaml").unwrap();
         let bot_config: PriconneConfig = serde_yaml::from_reader(config).unwrap();
 
-        assert_eq!(bot_config.fetch.server.api.len(), 5);
+        assert_eq!(bot_config.fetch.server.api.len(), 2);
         assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
         assert_eq!(
             bot_config.telegram.webhook_url,

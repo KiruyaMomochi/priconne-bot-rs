@@ -30,6 +30,8 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 url.workspace = true
 async-stream = "0.3.4"
+schemars = { version = "0.8.12", features = ["url", "chrono"] }
+clap = { version = "4.3.1", features = ["derive"] }
 
 [build-dependencies]
 built.workspace = true

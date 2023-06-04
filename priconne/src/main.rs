@@ -1,8 +1,40 @@
-use priconne::{built_info, service::api::ApiServer};
-use reqwest::Url;
+use clap::{Subcommand, Parser};
+use priconne::built_info;
+use schemars::{JsonSchema, schema_for};
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
+    /// Output JSON schema of config
+    Schema,
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+
+    if let Commands::Config { command: ConfigCommands::Schema } = cli.command {
+        let schema = schema_for!(priconne::config::PriconneConfig);
+        let schema = serde_json::to_string_pretty(&schema)?;
+        println!("{}", schema);
+        return Ok(());
+    }
+
     let ua = format!(
         "priconne-bot-rs/{} {} {}",
         built_info::PKG_VERSION,
@@ -15,11 +47,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let dbc = mongodb::Client::with_uri_str("mongodb+srv://staging:89qzo3qtcJ4IYMC1@mongodb.gnqxc.mongodb.net/?retryWrites=true&w=majority").await?;
     let _database = dbc.database("priconne-bot-develop");
-    let _api = ApiServer {
-        id: "PROD1".to_string(),
-        url: Url::parse("https://api-pc.so-net.tw/").unwrap(),
-        name: "美食殿堂".to_string(),
-    };
+    // let _api = ApiServer {
+    //     id: "PROD1".to_string(),
+    //     url: Url::parse("https://api-pc.so-net.tw/").unwrap(),
+    //     name: "美食殿堂".to_string(),
+    // };
 
     // let service = PriconneService {
     //     client,

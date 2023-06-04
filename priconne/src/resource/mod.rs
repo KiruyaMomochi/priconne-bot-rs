@@ -1,22 +1,27 @@
+//! Resource
+//! 
+//! This module defines various resources in Priconne world, such as
+//! announcements, cartoons, etc.
+
 pub mod announcement;
+pub mod api;
 pub mod cartoon;
 pub mod glossary;
 pub use announcement::*;
 
 use crate::{
     service::{
-        resource::{MemorizedResourceClient, ResourceClient},
         PriconneService,
     },
-    utils::HOUR,
+    utils::HOUR, client::{ResourceClient, MemorizedResourceClient},
 };
 use chrono::{DateTime, FixedOffset, Utc};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use cartoon::Thumbnail;
 use information::Announce;
 use news::News;
-use cartoon::Thumbnail;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Region {
@@ -132,6 +137,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    
-}
+mod tests {}

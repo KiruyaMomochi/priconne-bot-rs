@@ -1,38 +1,5 @@
 mod page;
-use async_trait::async_trait;
 pub use page::*;
-
-use crate::{
-    service::{
-        api::ApiClient,
-        resource::{MemorizedResourceClient, MetadataFindResult, ResourceClient},
-        AnnouncementService,
-    },
-    Error,
-};
-
-use super::{sources::AnnouncementSource, AnnouncementResponse};
-
-
-#[async_trait]
-impl AnnouncementService<Announce> for MemorizedResourceClient<Announce, ApiClient> {
-    type Page = InformationPage;
-
-    fn source(&self) -> AnnouncementSource {
-        AnnouncementSource::Api(self.client.api_server.id.clone())
-    }
-    async fn collect_latest_announcements(
-        &self,
-    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
-        self.latests().await
-    }
-    async fn fetch_response(
-        &self,
-        metadata: &Announce,
-    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
-        self.fetch(metadata).await
-    }
-}
 
 #[cfg(test)]
 mod tests {

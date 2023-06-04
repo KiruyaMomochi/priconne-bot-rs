@@ -2,16 +2,16 @@ pub mod information;
 pub mod news;
 
 use crate::{
-    insight::{AnnouncementPage, Tags, EventPeriod, AnnouncementInsight},
-    service::resource::ResourceResponse, utils::map_title, message::Sendable,
+    insight::{AnnouncementPage, EventPeriod, AnnouncementInsight},
+    utils::map_title, message::Sendable, client::ResourceResponse,
 };
 
-use chrono::{DateTime, Utc};
+
 use mongodb::bson;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
-use super::{Resource, Region};
+use super::{Region};
 
 // This will finally replaces `SentMessage`.
 #[serde_as]

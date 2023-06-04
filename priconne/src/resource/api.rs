@@ -1,7 +1,11 @@
+//! # API client
+//! `api` contains the client for the official Princess Connect! Re:Dive API.
+
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt, TryStreamExt, Stream};
 
 use reqwest::{Response, Url};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,12 +14,10 @@ use crate::{
         information::{AjaxAnnounceList, Announce, InformationPage},
         announcement::{sources::AnnouncementSource, AnnouncementResponse},
     },
-    Error, Page,
+    Error, Page, client::ResourceClient,
 };
 
-use super::resource::ResourceClient;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ApiServer {
     pub id: String,
     pub url: Url,

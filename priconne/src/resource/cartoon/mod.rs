@@ -1,21 +1,9 @@
 mod page;
-use async_trait::async_trait;
+pub mod service;
 pub use page::*;
 use reqwest::Url;
 
-use crate::{
-    message::{Message, Sendable},
-    service::{
-        api::ApiClient,
-        resource::{MemorizedResourceClient, ResourceClient, MetadataFindResult},
-        PriconneService, ResourceService,
-    },
-    Error,
-};
-
-pub struct CartoonService {
-    client: MemorizedResourceClient<Thumbnail, ApiClient>,
-}
+use crate::message::{Sendable, Message};
 
 pub struct Cartoon {
     pub id: i32,
@@ -43,34 +31,5 @@ impl Sendable for Cartoon {
             silent: false,
             image_src: Some(self.image_src.clone()),
         }
-    }
-}
-
-#[async_trait]
-impl ResourceService<MetadataFindResult<Thumbnail>> for CartoonService {
-    async fn collect_latests(
-        &self,
-        priconne: &PriconneService,
-    ) -> Result<Vec<MetadataFindResult<Thumbnail>>, Error> {
-        self.client.latests().await
-    }
-    async fn work(
-        &self,
-        priconne: &PriconneService,
-        result: MetadataFindResult<Thumbnail>,
-    ) -> Result<(), Error> {
-        let item = result.item();
-        let image_src = { self.client.fetch(item).await?.image_src };
-
-        let cartoon = Cartoon {
-            id: item.id,
-            episode: item.episode.clone(),
-            title: item.title.clone(),
-            image_src: Url::parse(&image_src)?,
-        };
-
-        priconne.chat_manager.send_cartoon(&cartoon).await?;
-
-        Ok(())
     }
 }

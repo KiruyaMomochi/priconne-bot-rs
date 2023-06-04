@@ -1,7 +1,34 @@
+# yaml-language-server: $schema=../../target/config.schema.json
 tags:
+  A: [AA]
+  B: [BB]
 client:
+  proxy: 127.0.0.1:8565
 mongo:
-  connection_string:
+  connection_string: mongodb://localhost:27017
+  database: test
 telegram:
+  debug_chat: 0
+  name: priconne
+  token: 123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+  webhook_url: https://example.com/webhook
+  listen_addr: 127.0.0.1:5555
 telegraph:
+  access_token: token
+  short_name: priconne
 fetch:
+  scheduler: {}
+  server:
+    api:
+      - id: PROD01
+        name: Production Server 1
+        url: https://prod01.example.com
+      - id: PROD02
+        name: Production Server 2
+        url: https://prod02.example.com
+    news: https://example.com
+  strategy:
+   base:
+     fuse_limit: 0
+     ignore_id_lt: 0
+     ignore_time_lt: 2023-01-01T00:00:00Z

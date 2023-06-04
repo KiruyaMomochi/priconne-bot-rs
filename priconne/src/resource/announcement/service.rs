@@ -35,7 +35,10 @@ where
 }
 
 #[async_trait]
-pub trait AnnouncementService<M: ResourceMetadata> {
+pub trait AnnouncementService<M: ResourceMetadata>
+where
+    Self: Sync,
+{
     type Page: AnnouncementPage;
 
     fn source(&self) -> AnnouncementSource;
@@ -48,10 +51,30 @@ pub trait AnnouncementService<M: ResourceMetadata> {
 }
 
 #[async_trait]
+impl AnnouncementService<Announce> for MemorizedResourceClient<Announce, ApiClient> {
+    type Page = InformationPage;
+
+    fn source(&self) -> AnnouncementSource {
+        AnnouncementSource::Api(self.client.api_server.id.clone())
+    }
+    async fn collect_latest_announcements(
+        &self,
+    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
+        self.latests().await
+    }
+    async fn fetch_response(
+        &self,
+        metadata: &Announce,
+    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
+        self.fetch(metadata).await
+    }
+}
+
+#[async_trait]
 impl<M, T> ResourceService<MetadataFindResult<M>> for T
 where
     M: ResourceMetadata,
-    T: AnnouncementService<M> + Sync,
+    T: AnnouncementService<M>,
 {
     /// Collect latest metadata
     async fn collect_latests(

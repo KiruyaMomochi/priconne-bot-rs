@@ -1,21 +1,15 @@
-pub mod api;
-pub mod resource;
+//! Service module
+//! 
+//! While the [`resource`] module is responsible for fetching and parsing data,
+//! this service layer is responsible for managing the resources, continuously
+//! fetching and parsing data, and sending messages using [`ChatManager`].
 
 use async_trait::async_trait;
-use tracing::trace;
-
-pub use resource::announcement::AnnouncementService;
 
 use crate::{
     error::Error,
-    insight::{tagging::RegexTagger, AnnouncementPage, Extractor},
-    message::ChatManager,
-    resource::{cartoon::Thumbnail, sources::AnnouncementSource, Resource, ResourceMetadata, AnnouncementResponse},
-    service::{resource::ResourceResponse}, database::AnnouncementCollection, config::FetchConfig,
-};
-
-use self::{
-    resource::{ResourceClient, SendableResourceClient, MetadataFindResult},
+    insight::{tagging::RegexTagger, Extractor},
+    message::ChatManager, config::FetchConfig,
 };
 
 // pub trait ServiceBuilder {
