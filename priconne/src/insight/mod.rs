@@ -130,7 +130,7 @@ pub trait AnnouncementPage {
     type ExtraData: Serialize + DeserializeOwned + Debug + Send;
 
     fn title(&self) -> String;
-    fn content(&self) -> kuchiki::NodeRef;
+    fn content(&self) -> kuchikiki::NodeRef;
     fn create_time(&self) -> Option<DateTime<FixedOffset>>;
     fn extra(&self) -> Self::ExtraData;
     fn tags(&self, tagger: &RegexTagger) -> LinkedHashSet<String> {

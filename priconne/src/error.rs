@@ -24,7 +24,7 @@ pub enum Error {
     CronError(#[from] tokio_cron_scheduler::JobSchedulerError),
     #[error("tokio cron `{0}` error")]
     SendError(String),
-    #[error("kuchiki error")]
+    #[error("kuchikiki error")]
     KuchikiError,
     #[error("no api server")]
     NoApiServer,

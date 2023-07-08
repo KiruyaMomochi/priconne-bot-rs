@@ -10,7 +10,7 @@ use crate::{
     Error, Page,
 };
 use chrono::{FixedOffset, NaiveDate};
-use kuchiki::{ElementData, NodeDataRef, NodeRef};
+use kuchikiki::{ElementData, NodeDataRef, NodeRef};
 use serde::{Deserialize, Serialize};
 
 pub fn get_date(date_node: NodeRef) -> Result<chrono::NaiveDate, Error> {
@@ -113,7 +113,7 @@ impl AnnouncementPage for NewsPage {
         self.title.clone()
     }
 
-    fn content(&self) -> kuchiki::NodeRef {
+    fn content(&self) -> kuchikiki::NodeRef {
         self.content_node.clone()
     }
 
@@ -159,13 +159,13 @@ fn get_content(section_node: &NodeDataRef<ElementData>) -> Result<&NodeRef, Erro
 mod tests {
     use super::*;
 
-    use kuchiki::traits::TendrilSink;
+    use kuchikiki::traits::TendrilSink;
     use std::path::Path;
 
     #[test]
     fn test_from_document() {
         let path = Path::new("tests/news_page.html");
-        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
         let page = NewsPage::from_document(document).unwrap();
         assert_eq!(page.date, NaiveDate::from_ymd_opt(2021, 8, 24).unwrap());
         assert_eq!(page.category, Some("活動".to_owned()));
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn test_from_1376() {
         let path = Path::new("tests/news_1376.html");
-        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
         let page = NewsPage::from_document(document).unwrap();
 
         assert_eq!(page.date, NaiveDate::from_ymd_opt(2021, 10, 26).unwrap());

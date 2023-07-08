@@ -109,7 +109,7 @@ async fn try_next_news_list(
 
     let response = client.get_raw(&href).await?;
     let text = response.text().await?;
-    let document = kuchiki::parse_html().one(text);
+    let document = kuchikiki::parse_html().one(text);
     let news_list = NewsList::from_document(document)?;
     let next_href = news_list.next_href.clone();
 

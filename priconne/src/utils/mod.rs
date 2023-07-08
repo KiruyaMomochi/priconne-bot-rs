@@ -167,7 +167,7 @@ pub fn replace_relative_path(
             children: _,
         }) = node
         {
-            if let Some(src) = attrs.get_mut("src") {
+            if let Some(Some(src)) = attrs.get_mut("src") {
                 if src.starts_with("./") {
                     *src = url.join(src)?.to_string();
                 }
@@ -201,11 +201,11 @@ pub fn map_title(title: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kuchiki::traits::TendrilSink;
+    use kuchikiki::traits::TendrilSink;
 
     #[test]
     fn test_trim_leading_whitespace() {
-        let document = kuchiki::parse_html()
+        let document = kuchikiki::parse_html()
             .one("<body><div></div><h1>Test</h1></body>")
             .select_first("body")
             .unwrap();

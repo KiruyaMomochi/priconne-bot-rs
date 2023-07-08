@@ -2,10 +2,10 @@ use crate::{Error, Page};
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct Glossary(pub HashMap<String, String>, kuchiki::NodeRef);
+pub struct Glossary(pub HashMap<String, String>, kuchikiki::NodeRef);
 
 impl Page for Glossary {
-    fn from_document(document: kuchiki::NodeRef) -> Result<Self, Error> {
+    fn from_document(document: kuchikiki::NodeRef) -> Result<Self, Error> {
         let glossary_node = document
             .select_first(".glossary")
             .map_err(|_| Error::KuchikiError)?;
@@ -43,7 +43,7 @@ impl Page for Glossary {
 
 #[cfg(test)]
 mod tests {
-    use kuchiki::traits::TendrilSink;
+    use kuchikiki::traits::TendrilSink;
 
     use super::*;
     use std::path::Path;
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn test_glossary_from_document() {
         let path = Path::new("tests/glossary.html");
-        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
         let glossary = Glossary::from_document(document).unwrap().0;
 
         assert_eq!(glossary.len(), 81);

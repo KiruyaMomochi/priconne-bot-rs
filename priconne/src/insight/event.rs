@@ -1,6 +1,6 @@
 use crate::utils::HOUR;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
-use kuchiki::{traits::NodeIterator, ElementData, NodeDataRef};
+use kuchikiki::{traits::NodeIterator, ElementData, NodeDataRef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

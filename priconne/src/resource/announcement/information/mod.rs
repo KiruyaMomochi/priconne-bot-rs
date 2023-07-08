@@ -3,7 +3,7 @@ pub use page::*;
 
 #[cfg(test)]
 mod tests {
-    use kuchiki::{traits::TendrilSink, NodeRef};
+    use kuchikiki::{traits::TendrilSink, NodeRef};
 
     // #[tokio::test]
     // pub async fn test_news_page() -> Result<(), Box<dyn std::error::Error>> {
@@ -118,7 +118,7 @@ mod tests {
 </div>
 </article>"#;
 
-            let node = kuchiki::parse_html()
+            let node = kuchikiki::parse_html()
                 .one(news)
                 .select_first(".news_con>section")
                 .unwrap();

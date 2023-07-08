@@ -4,11 +4,11 @@ use crate::{Error, Page};
 pub struct CartoonPage {
     pub id: String,
     pub image_src: String,
-    pub content: kuchiki::NodeRef,
+    pub content: kuchikiki::NodeRef,
 }
 
 impl Page for CartoonPage {
-    fn from_document(document: kuchiki::NodeRef) -> Result<Self, Error> {
+    fn from_document(document: kuchikiki::NodeRef) -> Result<Self, Error> {
         let main_cartoon_node = document
             .select_first(".main_cartoon")
             .map_err(|_| Error::KuchikiError)?;
@@ -43,11 +43,11 @@ impl Page for CartoonPage {
 mod tests {
     use super::*;
     use crate::Page;
-    use kuchiki::traits::TendrilSink;
+    use kuchikiki::traits::TendrilSink;
 
     #[test]
     fn test_from_document() {
-        let document = kuchiki::parse_html().one(r#"
+        let document = kuchikiki::parse_html().one(r#"
 <!DOCTYPE html>
 <html lang="zh" xml:lang="zh-TW">
 <head>

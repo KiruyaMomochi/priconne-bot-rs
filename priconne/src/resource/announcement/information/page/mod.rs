@@ -5,7 +5,7 @@ use crate::{insight::AnnouncementPage, Error, Page};
 pub use ajax::{AjaxAnnounce, AjaxAnnounceList, Announce, AnnounceTitle};
 use chrono::{DateTime, FixedOffset};
 pub use icon::Icon;
-use kuchiki::{ElementData, NodeDataRef, NodeRef};
+use kuchikiki::{ElementData, NodeDataRef, NodeRef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -53,7 +53,7 @@ impl Page for InformationPage {
 impl AnnouncementPage for InformationPage {
     type ExtraData = InformationExtra;
 
-    fn content(&self) -> kuchiki::NodeRef {
+    fn content(&self) -> kuchikiki::NodeRef {
         self.content_node.clone()
     }
 
@@ -108,14 +108,14 @@ fn get_date(date_node: &NodeRef) -> Option<DateTime<FixedOffset>> {
 // mod tests {
 //     use super::*;
 //     use chrono::TimeZone;
-//     use kuchiki::traits::TendrilSink;
+//     use kuchikiki::traits::TendrilSink;
 //     use std::{path::Path, str::FromStr};
 //     use crate::utils::HOUR;
 
 //     #[test]
 //     fn test_information_page_from_document() {
 //         let path = Path::new("tests/information.html");
-//         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+//         let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
 //         let page = InformationPage::from_document(document).unwrap();
 //         assert_eq!(
 //             page.title(),
@@ -136,7 +136,7 @@ fn get_date(date_node: &NodeRef) -> Option<DateTime<FixedOffset>> {
 //     #[tokio::test]
 //     async fn test_information_page_from_document_div() {
 //         let path = Path::new("tests/information_div.html");
-//         let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+//         let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
 //         let page = InformationPage::from_document(document).unwrap();
 
 //         assert_eq!(

@@ -1,7 +1,7 @@
 use crate::error::Error;
 
 use async_trait::async_trait;
-use kuchiki::{traits::TendrilSink, NodeRef};
+use kuchikiki::{traits::TendrilSink, NodeRef};
 
 /// A web page.
 #[async_trait]
@@ -14,7 +14,7 @@ where
 
     /// Create a new [`Page`] from a [`String`] containing the HTML.
     fn from_html(html: String) -> Result<Self, Error> {
-        let document = kuchiki::parse_html().one(html);
+        let document = kuchikiki::parse_html().one(html);
         Self::from_document(document)
     }
 }

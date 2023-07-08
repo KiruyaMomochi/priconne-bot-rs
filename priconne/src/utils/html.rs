@@ -1,15 +1,15 @@
 use html5ever::{local_name, namespace_url, ns, QualName};
-use kuchiki::{ElementData, NodeData, NodeRef};
+use kuchikiki::{ElementData, NodeData, NodeRef};
 
 /// Trim leading space in nodes, returns true if nodes isn't empty.
 ///
 /// Rescursively traverses the tree and detatch any empty string nodes,
 /// `<br>` nodes or empty `<br>`/`<div>`/`<p>` nodes. Trim beginning space of
 /// the first non-empty text node.
-pub fn trim_leading_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
+pub fn trim_leading_whitespace(sliblings: kuchikiki::iter::Siblings) -> bool {
     for slibling in sliblings {
         match slibling.data() {
-            NodeData::Element(element_data) => match element_data.name.local {
+            NodeData::Element(element_data) => match element_data.name.local.clone() {
                 // Detach `<br/>`
                 local_name!("br") => slibling.detach(),
                 local_name!("div") | local_name!("span") | local_name!("p") => {
@@ -54,10 +54,10 @@ pub fn trim_leading_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
 }
 
 /// Trim trailing space in nodes, returns true if nodes is not empty.
-pub fn trim_trailing_whitespace(sliblings: kuchiki::iter::Siblings) -> bool {
+pub fn trim_trailing_whitespace(sliblings: kuchikiki::iter::Siblings) -> bool {
     for slibling in sliblings.rev() {
         match slibling.data() {
-            NodeData::Element(element_data) => match element_data.name.local {
+            NodeData::Element(element_data) => match element_data.name.local.clone() {
                 // Detach `<br/>`
                 local_name!("br") => slibling.detach(),
                 local_name!("div") | local_name!("span") | local_name!("p") => {
@@ -158,7 +158,7 @@ fn is_start_with_linebreak(node: &NodeRef) -> bool {
 }
 
 /// Remove all nodes matching predicate and pull their children to the parent.
-pub fn pull_children<P>(sliblings: kuchiki::iter::Siblings, predicate: P)
+pub fn pull_children<P>(sliblings: kuchikiki::iter::Siblings, predicate: P)
 where
     P: Fn(&ElementData) -> bool,
 {
@@ -176,7 +176,7 @@ pub fn pull_first_image(node: &NodeRef) {
 
 fn pull_first_image_inner(node: NodeRef) -> Option<NodeRef> {
     if let Some(element) = node.as_element() {
-        match element.name.local {
+        match element.name.local.clone() {
             local_name!("div") | local_name!("p") if node.first_child().is_some() => {
                 return pull_first_image_inner(node.first_child().unwrap())
             }
@@ -189,7 +189,7 @@ fn pull_first_image_inner(node: NodeRef) -> Option<NodeRef> {
     None
 }
 
-fn pull_children_inner<P>(sliblings: kuchiki::iter::Siblings, predicate: &P)
+fn pull_children_inner<P>(sliblings: kuchikiki::iter::Siblings, predicate: &P)
 where
     P: Fn(&ElementData) -> bool,
 {
@@ -209,24 +209,24 @@ where
 }
 
 /// Remove all `<div>` and `<span>` nodes and pull their children to the parent.
-pub fn remove_div_span(sliblings: kuchiki::iter::Siblings) {
+pub fn remove_div_span(sliblings: kuchikiki::iter::Siblings) {
     pull_children(sliblings, |element| {
         element.name.local == local_name!("div") || element.name.local == local_name!("span")
     });
 }
 
 /// Remove all `<div>` nodes and pull their children to the parent.
-pub fn remove_div(sliblings: kuchiki::iter::Siblings) {
+pub fn remove_div(sliblings: kuchikiki::iter::Siblings) {
     pull_children(sliblings, |element| {
         element.name.local == local_name!("div")
     });
 }
 
 /// Replace last-level `<div>` nodes with `<p>` nodes.
-pub fn replace_div_with_p(sliblings: kuchiki::iter::Siblings) -> bool {
+pub fn replace_div_with_p(sliblings: kuchikiki::iter::Siblings) -> bool {
     let mut ret = false;
 
-    // Create a new element: https://github.com/kuchiki-rs/kuchiki/issues/60
+    // Create a new element: https://github.com/kuchikiki-rs/kuchikiki/issues/60
     for slibling in sliblings {
         if let Some(element) = slibling.as_element() {
             if element.name.local == local_name!("p") {
@@ -270,7 +270,7 @@ pub fn insert_br_between_div(node: &NodeRef) -> u32 {
 
             match preceding.data() {
                 NodeData::Element(element) => {
-                    if let local_name!("div") = element.name.local {
+                    if let local_name!("div") = element.name.local.clone() {
                         count += 1;
                         child.insert_before(NodeRef::new_element(
                             QualName::new(None, ns!(html), local_name!("br")),
@@ -295,7 +295,7 @@ pub fn fix_sonet_news(section_node: NodeRef) -> NodeRef {
     let first_child = section_node.first_child();
     if let Some(child) = first_child {
         if let Some(element) = child.as_element() {
-            if let local_name!("h4") = element.name.local {
+            if let local_name!("h4") = element.name.local.clone() {
                 if let Some(style) = element.attributes.borrow().get(local_name!("style")) {
                     if style == "display: none;" {
                         child.detach();
@@ -376,7 +376,7 @@ mod tests {
     營運團隊保有活動最終修改與詮釋之權利，實際內容請以遊戲內資訊為準。活動舉辦日期與內容，均有可能未先告知而逕行調整，確切詳情以實際開放時所述為主。</span></div>
 </div>"#;
 
-        kuchiki::parse_html()
+        kuchikiki::parse_html()
             .one(message)
             .select_first(".messages")
             .unwrap()
@@ -451,7 +451,7 @@ mod tests {
 </div>
 </article>"#;
 
-        let node = kuchiki::parse_html()
+        let node = kuchikiki::parse_html()
             .one(news)
             .select_first(".news_con>section")
             .unwrap();

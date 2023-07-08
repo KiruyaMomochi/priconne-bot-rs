@@ -21,8 +21,8 @@ tracing-log = "0.1"
 tracing-futures = "0.2"
 
 # Parsing
-kuchiki = "0.8.1"
-html5ever = "0.25.1" # Version required by kuchiki
+kuchikiki = "0.8.2"
+html5ever = "0.26.0" # Version required by kuchiki
 regex = "1"
 toml = "0.5.8"
 url = "2.2.2"

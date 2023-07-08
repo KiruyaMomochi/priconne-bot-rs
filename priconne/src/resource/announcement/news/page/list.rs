@@ -1,4 +1,4 @@
-use kuchiki::NodeRef;
+use kuchikiki::NodeRef;
 
 use crate::{Error, Page};
 
@@ -95,13 +95,13 @@ fn node_to_page(pagging_node: &NodeRef) -> Result<i32, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kuchiki::traits::TendrilSink;
+    use kuchikiki::traits::TendrilSink;
     use std::path::Path;
 
     #[test]
     fn test_from_document() {
         let path = Path::new("tests/news_list.html");
-        let document = kuchiki::parse_html().from_utf8().from_file(path).unwrap();
+        let document = kuchikiki::parse_html().from_utf8().from_file(path).unwrap();
 
         let result = NewsList::from_document(document).unwrap();
         println!("{result:#?}");
