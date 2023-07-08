@@ -1,5 +1,5 @@
 //! Resource
-//! 
+//!
 //! This module defines various resources in Priconne world, such as
 //! announcements, cartoons, etc.
 
@@ -10,10 +10,9 @@ pub mod glossary;
 pub use announcement::*;
 
 use crate::{
-    service::{
-        PriconneService,
-    },
-    utils::HOUR, client::{ResourceClient, MemorizedResourceClient},
+    client::{MemorizedResourceClient, ResourceClient},
+    service::PriconneService,
+    utils::HOUR,
 };
 use chrono::{DateTime, FixedOffset, Utc};
 

@@ -1,23 +1,60 @@
 # yaml-language-server: $schema=../../target/config.schema.json
 tags:
-  A: [AA]
-  B: [BB]
+  精選轉蛋: ["精選轉蛋"]
+  必中白金: ["★3必中白金轉蛋"]
+  獎勵轉蛋: ["獎勵轉蛋"]
+  戰隊競賽: ["戰隊競賽"]
+  露娜之塔: ["露娜之塔"]
+  外掛停權: ["外掛停權"]
+  公會小屋: ["公會小屋"]
+  大師商店: ["大師商店"]
+  停機維護: ["停機維護"]
+  復刻: ["復刻"]
+  探索: ["探索"]
+  地下城: ["地下城"]
+  NORMAL: ["「NORMAL」"]
+  HARD: ["「HARD」"]
+  VERYHARD: ["「VERY HARD」"]
+  登入送: ["登入送"]
+  劇情活動: ["劇情活動"]
+  補償: ["補償"]
+  調查: ["(聖跡|神殿)(調查|調査)"]
+  組合包: ["組合包"]
+  增量包: ["增量包"]
+  大師硬幣: ["大師硬幣"]
+  支線劇情: ["支線劇情"]
+  體力加倍: ["體力加倍"]
+  免費抽: ['免費\d+連?抽']
+  2倍掉落: ["2倍掉落", "落量2倍"]
+  3倍掉落: ["3倍掉落", "落量3倍"]
+  小遊戲: ["小遊戲"]
+  公主祭典: ["公主祭典"]
+  抽獎: ["抽獎"]
+  免十: ["免費10連"]
+  才能開花: ["才能開花"]
+  內容追加: ["內容"]
 client:
   proxy: 127.0.0.1:8565
 mongo:
   connection_string: mongodb://localhost:27017
   database: test
 telegram:
-  debug_chat: 0
   name: priconne
   token: 123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
-  webhook_url: https://example.com/webhook
+  # webhook_url: https://example.com/webhook
   listen_addr: 127.0.0.1:5555
+  recipient:
+    debug: 0
+    post: "@pcrtwstat"
+    cartoon: "@pcrtwstat"
 telegraph:
-  access_token: token
-  short_name: priconne
+  access_token: eecbd618d5730bb5b1609b5e3efa27e640b1eb2d7a41dbc4684292d73dab
+  short_name: sandbox
 fetch:
-  scheduler: {}
+  schedule:
+    news:
+      - "* 1 5-23 * * * *"
+      - "* 1 0,2,4 * * * *"
   server:
     api:
       - id: PROD01

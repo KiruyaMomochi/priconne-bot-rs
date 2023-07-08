@@ -82,7 +82,7 @@ async fn main() {
             bot,
             |bot: Bot, msg: Message, cmd: TelegramCommand| async move {
                 bot.send_message(msg.chat.id, format!("{cmd:?}")).await?;
-                respond(()) 
+                respond(())
             },
             listener
         )

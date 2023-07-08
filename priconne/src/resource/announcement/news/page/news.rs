@@ -1,5 +1,5 @@
+use crate::Error::{self, KuchikiError};
 use kuchiki::NodeRef;
-use crate::{Error::{self, KuchikiError}};
 use serde::{Deserialize, Serialize};
 
 use super::{get_category, get_date};

@@ -1,11 +1,9 @@
 use crate::{
+    client::{MemorizedResourceClient, MetadataFindResult, ResourceClient, ResourceResponse},
     database::AnnouncementCollection,
-    insight::{AnnouncementInsight, EventPeriod},
-    resource::{sources::AnnouncementSource, Announcement},
-    service::{
-        resource::ResourceResponse, AnnouncementPage, PriconneService, ResourceMetadata,
-        ResourceService,
-    },
+    insight::{AnnouncementInsight, AnnouncementPage, EventPeriod},
+    resource::{sources::AnnouncementSource, Announcement, ResourceMetadata},
+    service::{PriconneService, ResourceService},
     Error,
 };
 use async_trait::async_trait;
@@ -13,29 +11,23 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use tracing::{debug, trace};
 
-use super::{MetadataFindResult, ResourceClient};
 use crate::resource::announcement::AnnouncementResponse;
 
-#[async_trait]
+/// Clients that can fetch [`AnnouncementResponse`] need to implement this trait
+/// to privide what source they are fetching from.
 pub trait AnnouncementClient<M>:
     ResourceClient<M, Response = AnnouncementResponse<Self::Page>>
 where
     M: ResourceMetadata,
 {
+    // TODO: is it possible to provide a default implementation?
     type Page: AnnouncementPage;
+    fn source(&self) -> AnnouncementSource;
 }
 
-impl<M, T, P> AnnouncementClient<M> for T
-where
-    M: ResourceMetadata,
-    T: ResourceClient<M, Response = AnnouncementResponse<P>>,
-    P: AnnouncementPage,
-{
-    type Page = P;
-}
-
+/// Auto-implemented extension for [`MemorizedResourceClient`] that implements [`AnnouncementClient`]
 #[async_trait]
-pub trait AnnouncementService<M: ResourceMetadata>
+pub trait MemorizedAnnouncementClient<M: ResourceMetadata>
 where
     Self: Sync,
 {
@@ -51,21 +43,24 @@ where
 }
 
 #[async_trait]
-impl AnnouncementService<Announce> for MemorizedResourceClient<Announce, ApiClient> {
-    type Page = InformationPage;
+impl<M, Client> MemorizedAnnouncementClient<M> for MemorizedResourceClient<M, Client>
+where
+    M: ResourceMetadata,
+    Client: AnnouncementClient<M> + ResourceClient<M>,
+    Client::Page: AnnouncementPage,
+{
+    type Page = Client::Page;
 
     fn source(&self) -> AnnouncementSource {
-        AnnouncementSource::Api(self.client.api_server.id.clone())
+        self.client.source()
     }
-    async fn collect_latest_announcements(
-        &self,
-    ) -> Result<Vec<MetadataFindResult<Announce>>, Error> {
+    async fn collect_latest_announcements(&self) -> Result<Vec<MetadataFindResult<M>>, Error> {
         self.latests().await
     }
     async fn fetch_response(
         &self,
-        metadata: &Announce,
-    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
+        metadata: &M,
+    ) -> Result<<Self as ResourceClient<M>>::Response, Error> {
         self.fetch(metadata).await
     }
 }
@@ -74,7 +69,7 @@ impl AnnouncementService<Announce> for MemorizedResourceClient<Announce, ApiClie
 impl<M, T> ResourceService<MetadataFindResult<M>> for T
 where
     M: ResourceMetadata,
-    T: AnnouncementService<M>,
+    T: MemorizedAnnouncementClient<M>,
 {
     /// Collect latest metadata
     async fn collect_latests(
@@ -126,7 +121,7 @@ where
 
         trace!("{insight:?}");
         if let Some(announcement) = decision.update_announcement(insight, events) {
-            self.announcement_collection(&priconne)
+            self.announcement_collection(priconne)
                 .upsert(announcement)
                 .await?;
         };

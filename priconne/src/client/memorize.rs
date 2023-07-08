@@ -4,18 +4,13 @@
 //! [`FetchState`] to determine whether a resource should be fetched.
 //! [`MetadataFindResult`] is the resource metadata find result in database.
 
-
-use futures::{
-    StreamExt,
-};
-use mongodb::{bson::doc};
+use futures::StreamExt;
+use mongodb::bson::doc;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    resource::ResourceMetadata,
-};
+use crate::resource::ResourceMetadata;
 
 /// Resource fetch strategy.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

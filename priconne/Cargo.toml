@@ -12,7 +12,6 @@ html5ever.workspace = true
 http.workspace = true
 kuchiki.workspace = true
 linked_hash_set.workspace = true
-log.workspace = true
 mongodb.workspace = true
 regex.workspace = true
 reqwest.workspace = true

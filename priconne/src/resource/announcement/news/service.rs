@@ -1,19 +1,18 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt, Stream};
+use futures::{stream::BoxStream, Stream, TryStreamExt};
 
 use html5ever::tendril::TendrilSink;
 use reqwest::{Response, Url};
 
 use crate::{
+    client::ResourceClient,
     resource::{
-        news::{News, NewsList, NewsPage},
         announcement::{sources::AnnouncementSource, AnnouncementResponse},
+        news::{News, NewsList, NewsPage},
+        service::AnnouncementClient,
     },
-    service::{resource::ResourceClient, AnnouncementService},
     Error, Page,
 };
-
-use super::{MemorizedResourceClient, MetadataFindResult};
 
 #[derive(Debug, Clone)]
 pub struct NewsClient {
@@ -70,8 +69,6 @@ impl NewsClient {
         let stream =
             futures::stream::try_unfold((Some(self.list_href(1)), self), try_next_news_list);
 
-        
-
         stream
             .map_ok(|news_list| news_list.news_list.into_iter().map(Ok))
             .map_ok(futures::stream::iter)
@@ -79,25 +76,26 @@ impl NewsClient {
     }
 }
 
-
 #[async_trait]
-impl AnnouncementService<News> for MemorizedResourceClient<News, NewsClient> {
+impl ResourceClient<News> for NewsClient {
+    type Response = AnnouncementResponse<NewsPage>;
+    fn try_stream(&self) -> BoxStream<Result<News, Error>> {
+        Box::pin(self.try_stream())
+    }
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
+        self.get(id).await
+    }
+
+    // fn url_by_id(&self, id: i32) -> Result<url::Url, Error> {
+    //     self.url(&self.href(id))
+    // }
+}
+
+impl AnnouncementClient<News> for NewsClient {
     type Page = NewsPage;
 
     fn source(&self) -> AnnouncementSource {
         AnnouncementSource::Website
-    }
-
-    async fn collect_latest_announcements(
-        &self,
-    ) -> Result<Vec<MetadataFindResult<News>>, Error> {
-        self.latests().await
-    }
-    async fn fetch_response(
-        &self,
-        metadata: &News,
-    ) -> Result<AnnouncementResponse<Self::Page>, Error> {
-        self.fetch(metadata).await
     }
 }
 
@@ -118,24 +116,11 @@ async fn try_next_news_list(
     Ok(Some((news_list, (next_href, client))))
 }
 
-#[async_trait]
-impl ResourceClient<News> for NewsClient {
-    type Response = AnnouncementResponse<NewsPage>;
-    fn try_stream(&self) -> BoxStream<Result<News, Error>> {
-        Box::pin(self.try_stream())
-    }
-    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
-        self.get(id).await
-    }
-    // fn url_by_id(&self, id: i32) -> Result<url::Url, Error> {
-    //     self.url(&self.href(id))
-    // }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::service::{resource::{MemorizedResourceClient, FetchStrategy}};
+    use crate::client::FetchStrategy;
     use reqwest::Url;
+
     use super::*;
 
     #[tokio::test]
@@ -150,9 +135,10 @@ mod tests {
             ignore_id_lt: Some(9999),
             ..Default::default()
         };
-        let service = MemorizedResourceClient::new(client, strategy, collection);
+        client.source();
+        let client = client.memorize(collection, strategy);
 
-        let news = service.latests().await?;
+        let news = client.latests().await?;
         println!("{news:?}");
 
         Ok(())

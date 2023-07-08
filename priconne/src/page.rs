@@ -3,7 +3,6 @@ use crate::error::Error;
 use async_trait::async_trait;
 use kuchiki::{traits::TendrilSink, NodeRef};
 
-
 /// A web page.
 #[async_trait]
 pub trait Page

@@ -1,7 +1,7 @@
-use chrono::{FixedOffset, DateTime, TimeZone, Utc};
-use kuchiki::{NodeDataRef, ElementData, traits::NodeIterator};
-use serde::{Deserialize, Serialize};
 use crate::utils::HOUR;
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use kuchiki::{traits::NodeIterator, ElementData, NodeDataRef};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct EventPeriod {
@@ -22,7 +22,10 @@ fn parse_period(period_str: &str) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
     let start = start.trim();
     let end = end.trim();
 
-    let start = offset.datetime_from_str(start, fmt).ok()?.with_timezone(&Utc);
+    let start = offset
+        .datetime_from_str(start, fmt)
+        .ok()?
+        .with_timezone(&Utc);
     let end = offset.datetime_from_str(end, fmt).ok()?.with_timezone(&Utc);
 
     Some((start, end))

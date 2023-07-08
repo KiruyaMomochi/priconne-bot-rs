@@ -3,7 +3,7 @@ pub mod service;
 pub use page::*;
 use reqwest::Url;
 
-use crate::message::{Sendable, Message};
+use crate::message::{Message, Sendable};
 
 pub struct Cartoon {
     pub id: i32,

@@ -37,5 +37,5 @@ pub struct PageDetail {
     index_text: String,
     current: bool,
     current_page_id: i32,
-    page_set: i32
+    page_set: i32,
 }

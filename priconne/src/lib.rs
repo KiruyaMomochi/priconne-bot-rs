@@ -1,21 +1,23 @@
 #![feature(trait_alias)]
+// #![feature(min_specialization)]
 
 mod error;
 mod page;
 mod utils;
 
-mod database;
+pub mod database;
 
+pub mod client;
 pub mod config;
 pub mod insight;
 pub mod message;
-pub mod client;
 pub mod service;
 
 pub mod resource;
 
 pub use error::{Error, Result};
 pub use page::Page;
+pub use service::PriconneService;
 
 // Use of a mod or pub mod is not actually necessary.
 pub mod built_info {

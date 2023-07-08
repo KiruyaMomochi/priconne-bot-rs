@@ -6,13 +6,15 @@ use std::collections::HashMap;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use teloxide::requests::Requester;
+use teloxide::{requests::Requester, types::Recipient};
+use tracing::{event, info, span, Level};
 
 use crate::{
+    client::FetchStrategy,
     insight::{tagging::RegexTagger, Extractor},
     message::ChatManager,
-    resource::{Resource, api::ApiServer},
-    service::PriconneService, client::FetchStrategy,
+    resource::{api::ApiServer, Resource},
+    service::PriconneService,
 };
 
 /// This is useful for setting values in builder.
@@ -49,7 +51,7 @@ pub struct FetchConfig {
     /// Url endpoins to fetch resources
     pub server: ServerConfig,
     /// Fetch schedule
-    pub scheduler: HashMap<String, Vec<String>>,
+    pub schedule: HashMap<String, Vec<String>>,
     /// Fetch strategy
     pub strategy: StrategyConfig,
 }
@@ -64,7 +66,7 @@ pub struct MongoConfig {
 pub struct ClientConfig {
     user_agent: Option<String>,
     proxy: Option<String>,
-    no_proxy_list: Option<String>,
+    no_proxy: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -98,8 +100,32 @@ pub struct TelegramConfig {
     pub listen_addr: Option<String>,
     pub name: String,
     pub token: String,
-    #[schemars(with = "i64")]
-    pub debug_chat: teloxide::types::ChatId,
+    // #[schemars(with = "i64")]
+    // pub debug_chat: teloxide::types::ChatId,
+    pub recipient: RecipientConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct RecipientConfig {
+    #[schemars(with = "RemoteRecipient")]
+    pub debug: Recipient,
+    #[schemars(with = "RemoteRecipient")]
+    pub post: Recipient,
+    #[schemars(with = "RemoteRecipient")]
+    pub cartoon: Recipient,
+}
+
+/// A unique identifier for the target chat or username of the target channel
+/// (in the format `@channelusername`).
+#[derive(JsonSchema)]
+#[schemars(untagged)]
+pub enum RemoteRecipient {
+    /// A chat identifier.
+    #[schemars(with = "i32")]
+    Id(teloxide::types::ChatId),
+
+    /// A channel username (in the format @channelusername).
+    ChannelUsername(String),
 }
 
 impl TaggerConfig {
@@ -127,8 +153,8 @@ impl MongoConfig {
 
 impl ClientConfig {
     pub fn build(&self) -> Result<reqwest::Client, crate::Error> {
-        let mut client = reqwest::Client::builder()
-            .user_agent(self.user_agent.clone().unwrap_or(crate::ua()));
+        let mut client =
+            reqwest::Client::builder().user_agent(self.user_agent.clone().unwrap_or(crate::ua()));
 
         if let Some(proxy) = self
             .proxy
@@ -136,10 +162,11 @@ impl ClientConfig {
             .or_else(|| std::env::var("ALL_PROXY").ok())
         {
             let proxy = reqwest::Proxy::all(proxy)?;
-            let proxy = match &self.no_proxy_list {
+            let proxy = match &self.no_proxy {
                 Some(no_proxy) => proxy.no_proxy(reqwest::NoProxy::from_string(no_proxy)),
                 None => proxy.no_proxy(reqwest::NoProxy::from_env()),
             };
+            info!("Using proxy {:?}", proxy);
             client = client.proxy(proxy);
         }
 
@@ -195,10 +222,11 @@ impl TelegramConfig {
 }
 
 impl StrategyConfig {
-    pub fn build_for<R: Resource>(&self, resource: &R) -> FetchStrategy {
-        let name = resource.name().to_owned();
+    pub fn build_for(&self, resource: &str) -> FetchStrategy {
+        // let name = resource.name().to_owned();
+        let name = resource;
         let mut result = self.base.clone();
-        if let Some(over) = self.overrides.get(&name) {
+        if let Some(over) = self.overrides.get(name) {
             result = result.override_by(over)
         }
 
@@ -223,12 +251,8 @@ impl PriconneConfig {
             extractor,
             chat_manager: ChatManager {
                 bot,
-                post_recipient: teloxide::types::Recipient::ChannelUsername(
-                    "@pcrtwstat".to_owned(),
-                ),
-                cartoon_recipient: teloxide::types::Recipient::ChannelUsername(
-                    "@pcrtwstat".to_owned(),
-                ),
+                post_recipient: self.telegram.recipient.post.clone(),
+                cartoon_recipient: self.telegram.recipient.cartoon.clone(),
             },
         })
     }
@@ -236,6 +260,8 @@ impl PriconneConfig {
 
 #[cfg(test)]
 mod tests {
+    use teloxide::types::ChatId;
+
     use super::*;
     use std::fs::File;
 
@@ -247,8 +273,8 @@ mod tests {
         assert_eq!(bot_config.fetch.server.api.len(), 2);
         assert_eq!(bot_config.client.proxy, Some("127.0.0.1:8565".to_string()));
         assert_eq!(
-            bot_config.telegram.webhook_url,
-            Some("https://example.com/webhook".to_string())
+            bot_config.telegram.recipient.debug,
+            Recipient::Id(ChatId(0))
         );
         assert_eq!(
             bot_config.telegram.token,
@@ -264,5 +290,36 @@ mod tests {
         );
         assert_eq!(bot_config.mongo.database, "test".to_string());
         assert_eq!(bot_config.tags.0.len(), 2);
+    }
+
+    #[test]
+    fn test_build_schedule() {
+        let config = File::open("tests/config.yaml").unwrap();
+        let bot_config: PriconneConfig = serde_yaml::from_reader(config).unwrap();
+
+        let news_schedule = bot_config
+            .fetch
+            .schedule
+            .get("news")
+            .expect("key news")
+            .clone();
+        let mut schedule = tokio_cron_scheduler::Job::new(news_schedule, |_uuid, _lock| {})
+            .expect("create schedule");
+        let job_data = schedule.job_data().unwrap();
+        assert_eq!(
+            job_data.schedule().unwrap().to_string(),
+            "* 1 5-23 * * * * | * 1 0,2,4 * * * *".to_string()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_build_priconne() {
+        let config = File::open("tests/config.yaml").unwrap();
+        let bot_config: PriconneConfig = serde_yaml::from_reader(config).unwrap();
+        let priconne = bot_config.build().await.unwrap();
+        assert_eq!(
+            priconne.chat_manager.post_recipient,
+            Recipient::ChannelUsername("@pcrtwstat".to_string())
+        )
     }
 }

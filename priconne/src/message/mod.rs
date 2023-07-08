@@ -5,9 +5,7 @@ use teloxide::{
     types::{InputFile, Recipient},
 };
 
-use crate::{
-    Error,
-};
+use crate::Error;
 
 pub struct ChatManager {
     pub bot: teloxide::Bot,
@@ -31,7 +29,11 @@ pub trait Sendable {
 }
 
 impl ChatManager {
-    async fn send_to<C>(&self, message: Message, chat_id: C) -> Result<teloxide::prelude::Message, Error>
+    async fn send_to<C>(
+        &self,
+        message: Message,
+        chat_id: C,
+    ) -> Result<teloxide::prelude::Message, Error>
     where
         C: Into<Recipient> + Clone,
     {
@@ -55,14 +57,19 @@ impl ChatManager {
         Ok(send_result)
     }
 
-    pub async fn send_post<M: Sendable>(&self, post: &M) -> Result<teloxide::prelude::Message, Error> {
+    pub async fn send_post<M: Sendable>(
+        &self,
+        post: &M,
+    ) -> Result<teloxide::prelude::Message, Error> {
         self.send_to(post.message(), self.post_recipient.clone())
             .await
     }
 
-    pub async fn send_cartoon<M: Sendable>(&self, cartoon: &M) -> Result<teloxide::prelude::Message, Error> {
+    pub async fn send_cartoon<M: Sendable>(
+        &self,
+        cartoon: &M,
+    ) -> Result<teloxide::prelude::Message, Error> {
         self.send_to(cartoon.message(), self.cartoon_recipient.clone())
             .await
-        
     }
 }

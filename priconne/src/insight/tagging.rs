@@ -1,6 +1,6 @@
+use crate::utils::SplitPrefix;
 use linked_hash_set::LinkedHashSet;
 use regex::Regex;
-use crate::utils::SplitPrefix;
 
 /// A tagger that can tag a text with a list of strings.
 pub trait Tagger {
@@ -31,7 +31,7 @@ impl RegexTagger {
             title = base_title;
             tags.insert(category.to_string());
         }
-    
+
         tags.extend(self.tag_iter(title));
         tags.extend(extract_tag(title));
         tags
@@ -67,7 +67,6 @@ macro_rules! tagger {
         }
     };
 }
-
 
 /// Returns contents quoted by parenthesis, and their positions.
 ///
@@ -106,8 +105,8 @@ pub fn extract_quote(string: &str) -> Vec<(usize, String)> {
     result
 }
 
-/// Extract tags from title quoted by parenthesis, and their positions. 
-/// 
+/// Extract tags from title quoted by parenthesis, and their positions.
+///
 /// Nesting is not supported, and nesting same parenthesis may cause
 /// unexpected results. This function differs from [extract_quote] in that
 /// it's result is trimmed so that it does not contain whitespace or other
@@ -129,8 +128,7 @@ pub fn extract_tag(string: &str) -> Vec<String> {
 pub fn message_title(title: &str) -> (Option<String>, String) {
     if let Some((category, base_title)) = title.split_prefix('【', '】') {
         (Some(category.to_string()), base_title.to_string())
-    }
-    else {
+    } else {
         (None, title.to_string())
     }
 }

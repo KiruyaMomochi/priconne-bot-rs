@@ -76,7 +76,7 @@ impl SplitPrefix for str {
 
 pub mod chrono_date_utc8_as_bson_datetime {
     use crate::utils::HOUR;
-    
+
     use mongodb::bson::DateTime;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::result::Result;

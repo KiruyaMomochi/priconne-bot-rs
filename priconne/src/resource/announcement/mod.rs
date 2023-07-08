@@ -1,17 +1,23 @@
+//! Announcements
+//!
+//! Client that can fetch announcements should implement [`AnnouncementClient`] trait.
+
 pub mod information;
 pub mod news;
+pub mod service;
 
 use crate::{
-    insight::{AnnouncementPage, EventPeriod, AnnouncementInsight},
-    utils::map_title, message::Sendable, client::ResourceResponse,
+    client::ResourceResponse,
+    insight::{AnnouncementInsight, AnnouncementPage, EventPeriod},
+    message::Sendable,
+    utils::map_title,
 };
 
-
 use mongodb::bson;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 
-use super::{Region};
+use super::Region;
 
 // This will finally replaces `SentMessage`.
 #[serde_as]
@@ -75,11 +81,6 @@ impl Sendable for Announcement {
         }
     }
 }
-
-// pub trait AnnouncementResource = Announcement + Resource
-// where
-//     <Self as Resource>::Client:
-//         AnnouncementClient<<Self as Resource>::Metadata, Page = <Self as Announcement>::Page>;
 
 pub mod sources {
     use super::*;

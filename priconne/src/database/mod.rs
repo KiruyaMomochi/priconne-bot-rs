@@ -1,3 +1,5 @@
+//! Database wrappers
+
 use mongodb::{
     bson::doc,
     options::{FindOneAndReplaceOptions, FindOneOptions},
@@ -111,7 +113,6 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    
 
     pub async fn init_db() -> Result<mongodb::Database, mongodb::error::Error> {
         let client =

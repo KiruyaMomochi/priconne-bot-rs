@@ -1,6 +1,6 @@
+use crate::utils::api_date_format;
 use chrono::{DateTime, FixedOffset, TimeZone};
 use serde::{Deserialize, Serialize};
-use crate::utils::api_date_format;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AjaxAnnounceList {

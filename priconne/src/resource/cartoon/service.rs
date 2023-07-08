@@ -1,16 +1,17 @@
 use crate::{
-    client::{ResourceClient, MemorizedResourceClient, MetadataFindResult, ResourceResponse},
+    client::{MemorizedResourceClient, MetadataFindResult, ResourceClient, ResourceResponse},
+    resource::api::ApiClient,
     service::{PriconneService, ResourceService},
-    Error, resource::api::ApiClient,
+    Error,
 };
 
 use async_trait::async_trait;
 use reqwest::Url;
 
-use super::{Thumbnail, Cartoon};
+use super::{Cartoon, Thumbnail};
 
 pub struct CartoonService {
-    client: MemorizedResourceClient<Thumbnail, ApiClient>,
+    pub client: MemorizedResourceClient<Thumbnail, ApiClient>,
 }
 
 #[async_trait]
@@ -41,6 +42,5 @@ impl ResourceService<MetadataFindResult<Thumbnail>> for CartoonService {
         Ok(())
     }
 }
-
 
 impl ResourceResponse for crate::resource::cartoon::CartoonPage {}

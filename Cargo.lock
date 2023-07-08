@@ -1630,7 +1630,6 @@ dependencies = [
  "http",
  "kuchiki",
  "linked_hash_set",
- "log",
  "mongodb",
  "regex",
  "reqwest",

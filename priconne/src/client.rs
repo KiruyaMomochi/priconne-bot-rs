@@ -32,6 +32,8 @@ pub trait ResourceResponse {
 }
 
 /// `ResourceClient` is a client fetching and parsing resources.
+///
+/// Such a client is only responsible for fetching and parsing resources.
 #[async_trait]
 pub trait ResourceClient<M>
 where
@@ -43,6 +45,17 @@ where
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error>;
     async fn fetch(&self, resource: &M) -> Result<Self::Response, Error> {
         self.get_by_id(resource.id()).await
+    }
+    /// Create a [`MemorizedResourceClient`] from this client.
+    fn memorize(
+        self,
+        collection: Collection<M>,
+        strategy: FetchStrategy,
+    ) -> MemorizedResourceClient<M, Self>
+    where
+        Self: Sized,
+    {
+        MemorizedResourceClient::new(self, strategy, collection)
     }
 }
 
@@ -68,7 +81,7 @@ where
     Client: ResourceClient<M>,
     M: ResourceMetadata,
 {
-    pub fn new(client: Client, strategy: FetchStrategy, collection: Collection<M>) -> Self {
+    fn new(client: Client, strategy: FetchStrategy, collection: Collection<M>) -> Self {
         Self {
             client,
             strategy,

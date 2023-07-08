@@ -31,7 +31,7 @@ pub enum Error {
     #[error("the article has no title")]
     EmptyTitleError,
     #[error("Source is invalid")]
-    InvalidSource
+    InvalidSource,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,5 +1,5 @@
 //! Service module
-//! 
+//!
 //! While the [`resource`] module is responsible for fetching and parsing data,
 //! this service layer is responsible for managing the resources, continuously
 //! fetching and parsing data, and sending messages using [`ChatManager`].
@@ -7,9 +7,10 @@
 use async_trait::async_trait;
 
 use crate::{
+    config::FetchConfig,
     error::Error,
     insight::{tagging::RegexTagger, Extractor},
-    message::ChatManager, config::FetchConfig,
+    message::ChatManager,
 };
 
 // pub trait ServiceBuilder {
@@ -25,7 +26,9 @@ pub trait ResourceService<M> {
     /// Collect latest metadata
     async fn collect_latests(&self, priconne: &PriconneService) -> Result<Vec<M>, Error>;
     /// For any given metadata, extract data from it
-    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error> where M: 'async_trait;
+    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>
+    where
+        M: 'async_trait;
 }
 
 /// Central service for Priconne resource management.

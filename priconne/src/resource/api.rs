@@ -2,20 +2,23 @@
 //! `api` contains the client for the official Princess Connect! Re:Dive API.
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt, Stream};
+use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 
 use reqwest::{Response, Url};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    client::ResourceClient,
     resource::{
+        announcement::{sources::AnnouncementSource, AnnouncementResponse},
         cartoon::{CartoonPage, PagerDetail, PagerTop, Thumbnail, ThumbnailList},
         information::{AjaxAnnounceList, Announce, InformationPage},
-        announcement::{sources::AnnouncementSource, AnnouncementResponse},
     },
-    Error, Page, client::ResourceClient,
+    Error, Page,
 };
+
+use super::service::AnnouncementClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ApiServer {
@@ -37,9 +40,7 @@ impl ApiClient {
     }
 
     fn information_href(&self, announce_id: i32) -> String {
-        format!(
-            "information/detail/{announce_id}/1/10/1"
-        )
+        format!("information/detail/{announce_id}/1/10/1")
     }
 
     fn ajax_href(&self, offset: i32) -> String {
@@ -84,7 +85,6 @@ impl ApiClient {
 
     pub fn announce_try_stream(&self) -> impl Stream<Item = Result<Announce, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_ajax);
-        
 
         stream
             .map_ok(|ajax_announce| {
@@ -135,9 +135,7 @@ impl ApiClient {
     }
 
     fn cartoon_pager_detail_href(current_page_id: i32, page_set: i32) -> String {
-        format!(
-            "cartoon/pager/1/{current_page_id}/{page_set}"
-        )
+        format!("cartoon/pager/1/{current_page_id}/{page_set}")
     }
 
     fn cartoon_detail_href(id: i32) -> String {
@@ -182,7 +180,6 @@ impl ApiClient {
 
     pub fn thumbnail_try_stream(&self) -> impl Stream<Item = Result<Thumbnail, Error>> + '_ {
         let stream = futures::stream::try_unfold((0, self), try_next_thumbnails);
-        
 
         stream
             .map_ok(|x| x.into_iter().map(Ok))
@@ -208,6 +205,14 @@ impl ResourceClient<Announce> for ApiClient {
     }
     async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
         self.get_information(id).await
+    }
+}
+
+impl AnnouncementClient<Announce> for ApiClient {
+    type Page = InformationPage;
+
+    fn source(&self) -> AnnouncementSource {
+        AnnouncementSource::Api(self.api_server.id.clone())
     }
 }
 
