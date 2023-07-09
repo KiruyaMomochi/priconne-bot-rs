@@ -21,6 +21,12 @@ use crate::{
 //     fn build_service(&self, priconne: &PriconneService) -> Self::Service;
 // }
 
+/// Resource collection is generalized to two steps, as in this trait.
+///
+/// 1. Get metadata from remote
+/// 2. Fetch full content of metadata (if required), send a chat and insert them into database.
+///
+/// TODO: We need to housekeep the database.
 #[async_trait]
 pub trait ResourceService<M> {
     /// Collect latest metadata

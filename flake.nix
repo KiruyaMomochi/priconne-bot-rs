@@ -65,6 +65,7 @@
                   # Unset all empty environment variables
                   unset $(printenv | awk -F= '$2=="" { print $1 }')
                   export RUST_SRC_PATH="${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+                  export FLAKE_REV="${self.rev or "dirty"}";
                 '';
               })
             ];

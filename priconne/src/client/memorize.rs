@@ -1,16 +1,121 @@
-//! Helper types for [`MemorizedResourceClient`].
+//! [`MemorizedResourceClient`] and helper types.
 //!
 //! [`FetchStrategy`] defines the strategy of fetching resources, which is used by
 //! [`FetchState`] to determine whether a resource should be fetched.
 //! [`MetadataFindResult`] is the resource metadata find result in database.
 
-use futures::StreamExt;
-use mongodb::bson::doc;
-
+use super::{ResourceClient, ResourceMetadataCollection};
+use crate::{resource::ResourceMetadata, Error};
+use async_trait::async_trait;
+use futures::{future, stream::BoxStream, TryStreamExt};
+use mongodb::{bson::doc, Collection};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::resource::ResourceMetadata;
+/// Wrapped `ResourceClient` that memorizes the fetched resource metadata.
+pub struct MemorizedResourceClient<M, Client>
+where
+    Client: ResourceClient<M>,
+    M: ResourceMetadata,
+{
+    pub client: Client,
+    pub strategy: FetchStrategy,
+    pub collection: ResourceMetadataCollection<M>,
+}
+
+impl<M, Client> MemorizedResourceClient<M, Client>
+where
+    Client: ResourceClient<M>,
+    M: ResourceMetadata,
+{
+    pub(super) fn new(client: Client, strategy: FetchStrategy, collection: Collection<M>) -> Self {
+        Self {
+            client,
+            strategy,
+            collection: ResourceMetadataCollection::new(collection),
+        }
+    }
+
+    async fn updated(&self, item: M) -> Result<MetadataFindResult<M>, Error> {
+        let in_db = self.collection.find(&item).await?;
+
+        let update = match in_db {
+            Some(in_db) => MetadataFindResult::from_found(item, in_db),
+            None => MetadataFindResult::from_new(item),
+        };
+
+        Ok(update)
+    }
+
+    async fn upsert(&self, item: &M) -> Result<Option<M>, Error> {
+        self.collection.upsert(item).await.map_err(Error::from)
+    }
+
+    /// Fetches all resources and their state in the database, as a stream.
+    fn compared_stream<'stream>(&'stream self) -> BoxStream<Result<MetadataFindResult<M>, Error>>
+    where
+        Self: Sync,
+        M: 'stream,
+    {
+        let result = self
+            .try_stream()
+            .and_then(|item| self.updated(item))
+            .into_stream();
+
+        Box::pin(result)
+    }
+
+    /// Fetches resources that are new or updated in the database, as a stream.
+    pub fn fused_stream<'stream>(&'stream self) -> BoxStream<Result<MetadataFindResult<M>, Error>>
+    where
+        Self: Sync,
+        M: Send + 'stream,
+    {
+        let mut fetch_state = self.strategy.build();
+        let result = self
+            .compared_stream()
+            .try_take_while(move |update| {
+                tracing::trace!(
+                    "id = {}, new: {}, update: {}",
+                    update.item().id(),
+                    update.is_new(),
+                    update.is_update()
+                );
+                future::ok(fetch_state.keep_going(update.item(), update.is_update()))
+            })
+            .try_filter(|update| future::ready(update.is_not_same()));
+
+        Box::pin(result)
+    }
+
+    /// Fetches resources that are new or updated in the database, as a vector.
+    pub async fn latests(&self) -> Result<Vec<MetadataFindResult<M>>, Error>
+    where
+        M: Send,
+    {
+        let stream = self.fused_stream();
+        let result: Vec<_> = stream.try_collect().await?;
+
+        let result = result.into_iter().rev().collect();
+
+        Ok(result)
+    }
+}
+
+#[async_trait]
+impl<M, Client> ResourceClient<M> for MemorizedResourceClient<M, Client>
+where
+    Client: ResourceClient<M>,
+    M: ResourceMetadata,
+{
+    type Response = Client::Response;
+    fn try_stream(&self) -> BoxStream<Result<M, Error>> {
+        self.client.try_stream()
+    }
+    async fn get_by_id(&self, id: i32) -> Result<Self::Response, Error> {
+        self.client.get_by_id(id).await
+    }
+}
 
 /// Resource fetch strategy.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

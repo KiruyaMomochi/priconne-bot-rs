@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         straegy,
     );
     let latests = memorized.collect_latests(&priconne).await?;
+
     println!("{:?}", latests);
 
     // let _api = ApiServer {
