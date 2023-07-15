@@ -19,6 +19,7 @@ use crate::resource::{
 
 use self::tagging::RegexTagger;
 
+/// Insight collected from an announcement.
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct AnnouncementInsight<E> {
@@ -36,6 +37,10 @@ pub struct AnnouncementInsight<E> {
     #[serde_as(as = "Option<mongodb::bson::DateTime>")]
     pub update_time: Option<DateTime<Utc>>,
     pub telegraph_url: Option<String>,
+    /// Events in the announcement.
+    /// The current design is save a different events vector for each announcement.
+    /// The latest saved events will be used when building message.
+    pub events: Vec<EventPeriod>,
     pub extra: E,
 }
 
@@ -60,6 +65,7 @@ where
             create_time: self.create_time,
             update_time: self.update_time,
             telegraph_url: self.telegraph_url,
+            events: self.events,
             extra: mongodb::bson::to_bson(&self.extra).unwrap(),
         }
     }
@@ -142,13 +148,14 @@ pub trait AnnouncementPage {
 }
 
 impl Extractor {
+    /// Extract announcement insight and events from the response.
     pub fn extract_announcement<P: AnnouncementPage>(
         &self,
         response: &AnnouncementResponse<P>,
-    ) -> (AnnouncementInsight<P::ExtraData>, Vec<EventPeriod>) {
+    ) -> AnnouncementInsight<P::ExtraData> {
         let page = &response.page;
 
-        let insight = AnnouncementInsight::<P::ExtraData> {
+        AnnouncementInsight::<P::ExtraData> {
             id: response.post_id,
             url: response.url.clone(),
             source: response.source.clone(),
@@ -157,10 +164,9 @@ impl Extractor {
             create_time: page.create_time().map(|t| t.with_timezone(&Utc)),
             update_time: page.create_time().map(|t| t.with_timezone(&Utc)),
             telegraph_url: None,
+            events: page.events(),
             extra: page.extra(),
-        };
-
-        (insight, page.events())
+        }
     }
 }
 

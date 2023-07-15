@@ -9,7 +9,7 @@ use crate::{
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use tracing::{debug, trace};
+use tracing::{debug, instrument, trace};
 
 use crate::resource::announcement::AnnouncementResponse;
 
@@ -26,8 +26,13 @@ where
 }
 
 /// Auto-implemented extension for [`MemorizedResourceClient`] that implements [`AnnouncementClient`]
+/// In other words, if you [`memorized`](ResourceClient::memorize) a [`AnnouncementClient`], that
+/// client implements [`MemorizedAnnouncementClient`] automatically. Beyond that, it makes
+/// [`ResourceService`] implemented.
+///
+/// Note that there are two different collections: one for metadata and one for all announcements.
 #[async_trait]
-pub trait MemorizedAnnouncementClient<M: ResourceMetadata>
+trait MemorizedAnnouncementClient<M: ResourceMetadata>
 where
     Self: Sync,
 {
@@ -37,7 +42,10 @@ where
     fn announcement_collection(&self, priconne: &PriconneService) -> AnnouncementCollection {
         AnnouncementCollection(priconne.database.collection("announcement"))
     }
-    async fn collect_latest_announcements(&self) -> Result<Vec<MetadataFindResult<M>>, Error>;
+    /// Fetch latest announcements and compare with metadata collection
+    async fn collect_latest_metadatas(&self) -> Result<Vec<MetadataFindResult<M>>, Error>;
+    /// Upsert the metadata into the metadata collection
+    async fn upsert_metadata(&self, metadata: &M) -> Result<Option<M>, Error>;
     async fn fetch_response(&self, metadata: &M)
         -> Result<AnnouncementResponse<Self::Page>, Error>;
 }
@@ -54,8 +62,11 @@ where
     fn source(&self) -> AnnouncementSource {
         self.client.source()
     }
-    async fn collect_latest_announcements(&self) -> Result<Vec<MetadataFindResult<M>>, Error> {
+    async fn collect_latest_metadatas(&self) -> Result<Vec<MetadataFindResult<M>>, Error> {
         self.latests().await
+    }
+    async fn upsert_metadata(&self, metadata: &M) -> Result<Option<M>, Error> {
+        self.upsert(metadata).await
     }
     async fn fetch_response(
         &self,
@@ -76,11 +87,12 @@ where
         &self,
         _priconne: &PriconneService,
     ) -> Result<Vec<MetadataFindResult<M>>, Error> {
-        self.collect_latest_announcements().await
+        self.collect_latest_metadatas().await
     }
 
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
+    #[instrument(skip(self, priconne), fields(source = %self.source()))]
     async fn work(
         &self,
         priconne: &PriconneService,
@@ -90,24 +102,26 @@ where
         M: 'async_trait,
     {
         let source = self.source();
+        let announcements = self.announcement_collection(priconne);
 
-        let announcement = self
-            .announcement_collection(priconne)
+        let found = announcements
             .find_resource(metadata.item(), &source)
             .await?;
 
-        let mut decision = AnnouncementDecision::new(source.clone(), metadata, announcement);
+        let decision = AnnouncementDecision::new(&source, &metadata, &found);
 
-        let Some(metadata) = decision.should_request() else {return Ok(());};
+        if !decision.should_request() {
+            return Ok(());
+        };
 
         // ask client to get full article
         // maybe other things like thumbnail for cartoon, todo
-        let (mut insight, events, content) = {
-            let response = self.fetch_response(metadata).await?;
-            let (insight, events) = priconne.extractor.extract_announcement(&response);
+        let (mut insight, content) = {
+            let response = self.fetch_response(metadata.item()).await?;
+            let insight = priconne.extractor.extract_announcement(&response);
             let extra = Some(serde_json::to_string_pretty(&insight.extra)?);
 
-            (insight, events, response.telegraph_content(extra)?)
+            (insight, response.telegraph_content(extra)?)
         };
 
         // extract data
@@ -118,17 +132,19 @@ where
             .await?;
 
         insight.telegraph_url = Some(telegraph.url);
-
         trace!("{insight:?}");
-        if let Some(announcement) = decision.update_announcement(insight, events) {
-            self.announcement_collection(priconne)
-                .upsert(announcement)
+        let announcement = Announcement::new(insight, found);
+
+        if decision.send_post_and_continue() {
+            let message = priconne
+                .chat_manager
+                .send_announcement(&announcement)
                 .await?;
+            trace!("message sent: {:?}", message.url());
         };
 
-        if let Some(announcement) = decision.send_post_and_continue() {
-            let message = priconne.chat_manager.send_post(announcement).await?;
-        };
+        self.upsert_metadata(metadata.item()).await?;
+        announcements.upsert(&announcement).await?;
 
         Ok(())
     }
@@ -136,15 +152,16 @@ where
 
 /// Use information about a resource to find action to take
 #[derive(Debug)]
-pub struct AnnouncementDecision<R: ResourceMetadata> {
+pub struct AnnouncementDecision {
     /// Action to take
     pub action: Action,
     /// Source of item
     pub source: AnnouncementSource,
-    /// Item in database before fetch
-    pub resource: MetadataFindResult<R>,
-    /// Post item
-    pub announcement: Option<Announcement>,
+    announcement_found: bool,
+    // /// Item in database before fetch
+    // pub resource: &'a MetadataFindResult<R>,
+    // /// Post item
+    // pub announcement: &'a Option<Announcement>,
 }
 
 /// Action to take
@@ -160,55 +177,38 @@ pub enum Action {
     Edit,
 }
 
-impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
-    pub fn should_request(&self) -> Option<&R> {
+impl AnnouncementDecision {
+    pub fn should_request(&self) -> bool {
         match self.action {
-            Action::None => None,
-            _ => Some(self.resource.item()),
+            Action::None => false,
+            _ => true,
         }
     }
 
-    pub fn update_announcement<E>(
-        &mut self,
-        insight: AnnouncementInsight<E>,
-        events: Vec<EventPeriod>,
-    ) -> Option<&Announcement>
-    where
-        E: Serialize + DeserializeOwned,
-    {
-        match self.announcement.as_mut() {
-            Some(post) => {
-                post.push(insight, events);
-            }
-            None => self.announcement = Some(Announcement::new(insight, events)),
-        };
-        self.announcement.as_ref()
-    }
-
-    pub fn send_post_and_continue(&self) -> Option<&Announcement> {
+    pub fn send_post_and_continue(&self) -> bool {
         match self.action {
-            Action::Send => self.announcement.as_ref(),
-            _ => None,
+            Action::Send => true,
+            _ => false,
         }
     }
 }
 
 /// TODO: random write, may all wrong
-impl<R: ResourceMetadata + Debug> AnnouncementDecision<R> {
-    pub fn new(
-        source: AnnouncementSource,
-        find_result: MetadataFindResult<R>,
-        announcement: Option<Announcement>,
+impl AnnouncementDecision {
+    pub fn new<R: ResourceMetadata + Debug>(
+        source: &AnnouncementSource,
+        find_result: &MetadataFindResult<R>,
+        found: &Option<Announcement>,
     ) -> Self {
         Self {
-            action: Self::get_action(&source, &find_result, &announcement),
-            source,
-            resource: find_result,
-            announcement,
+            action: Self::get_action(&source, &find_result, &found),
+            source: source.clone(),
+            announcement_found: found.is_some(),
         }
     }
 
-    fn get_action(
+    #[instrument]
+    fn get_action<R: ResourceMetadata + Debug>(
         source: &AnnouncementSource,
         resource: &MetadataFindResult<R>,
         post: &Option<Announcement>,

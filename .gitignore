@@ -4,3 +4,4 @@
 /.devenv
 /mongodb
 *.bkp
+.pre-commit-config.yaml

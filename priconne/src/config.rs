@@ -13,7 +13,7 @@ use crate::{
     client::FetchStrategy,
     insight::{tagging::RegexTagger, Extractor},
     message::ChatManager,
-    resource::{api::ApiServer, Resource},
+    resource::{api::ApiServer, ResourceId},
     service::PriconneService,
 };
 
@@ -244,7 +244,6 @@ impl PriconneConfig {
         let extractor = Extractor { tagger };
 
         Ok(PriconneService {
-            database,
             telegraph,
             client,
             config: self.fetch.clone(),
@@ -253,7 +252,9 @@ impl PriconneConfig {
                 bot,
                 post_recipient: self.telegram.recipient.post.clone(),
                 cartoon_recipient: self.telegram.recipient.cartoon.clone(),
+                messages: database.collection("messages"),
             },
+            database,
         })
     }
 }

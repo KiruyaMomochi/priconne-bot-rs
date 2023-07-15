@@ -42,9 +42,14 @@
               ({ pkgs, ... }: {
                 languages.rust = {
                   enable = true;
-                  packages = { inherit (rustPackages) cargo clippy rust-src rustc rustfmt; };
+                  toolchain = { inherit (rustPackages) cargo clippy rust-src rustc rustfmt; };
                 };
 
+                pre-commit.tools = pkgs.lib.mkForce {
+                  clippy = rustPackages.clippy;
+                  cargo = rustPackages.cargo;
+                  rustfmt = rustPackages.rustfmt;
+                };
                 pre-commit.hooks = {
                   clippy.enable = true;
                   rustfmt.enable = true;

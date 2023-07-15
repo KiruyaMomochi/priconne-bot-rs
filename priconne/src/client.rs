@@ -24,7 +24,7 @@ use crate::{
 mod memorize;
 pub use memorize::{FetchState, FetchStrategy, MemorizedResourceClient, MetadataFindResult};
 
-/// The response of a resource client.
+/// The response from a resource client.
 pub trait ResourceResponse {
     fn telegraph_content(&self, _extra: Option<String>) -> Result<Option<String>, crate::Error> {
         Ok(None)

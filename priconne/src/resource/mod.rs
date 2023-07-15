@@ -2,12 +2,24 @@
 //!
 //! This module defines various resources in Priconne world, such as
 //! announcements, cartoons, etc.
+//!
+//! XXX: For [`ResourceId`] Here is a not-so-good design:
+//! > What does our "Resource" mean?
+//!
+//! As [`ResourceId`] is mainly for cross-referencing in [`SendResult`](crate::message::SendResult),
+//! we use [`announcement::Announcement`] instead of detailed resource there because
+//! each message represents a full announcement.
+//!
+//! However, currently [`News`] and [`Announce`] are definitely a resource too, as
+//! they are fetched from remote and stored in database. We need to find a way to
+//! correctly define what is a resource and what is not.
 
 pub mod announcement;
 pub mod api;
 pub mod cartoon;
 pub mod glossary;
 pub use announcement::*;
+use mongodb::bson;
 
 use crate::{
     client::{MemorizedResourceClient, ResourceClient},
@@ -25,6 +37,7 @@ use news::News;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Region {
     JP,
+    /// No more
     EN,
     TW,
     CN,
@@ -32,19 +45,11 @@ pub enum Region {
     TH,
 }
 
-/// Resource is assets in Priconne world, this can be an announcement or a cartoon page
-pub trait Resource {
-    type Metadata: ResourceMetadata;
-    type Client: ResourceClient<Self::Metadata>;
-
-    fn name(&self) -> &'static str;
-    fn build_service(
-        &self,
-        priconne: &PriconneService,
-    ) -> MemorizedResourceClient<Self::Metadata, Self::Client>;
-    fn collection_name(&self) -> &'static str {
-        self.name()
-    }
+/// Identifiers for resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceId {
+    Announcement(bson::oid::ObjectId),
+    Cartoon(i32),
 }
 
 /// Metadata for a resource

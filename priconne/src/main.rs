@@ -10,7 +10,6 @@ use priconne::{
     service::{PriconneService, ResourceService},
 };
 use schemars::schema_for;
-use tracing::log::info;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -77,9 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         priconne.database.collection("api_cache"),
         straegy,
     );
-    let latests = memorized.collect_latests(&priconne).await?;
-
-    println!("{:?}", latests);
+    priconne.serve_and_work(memorized).await?;
 
     // let _api = ApiServer {
     //     id: "PROD1".to_string(),

@@ -47,7 +47,7 @@ where
         Ok(update)
     }
 
-    async fn upsert(&self, item: &M) -> Result<Option<M>, Error> {
+    pub(crate) async fn upsert(&self, item: &M) -> Result<Option<M>, Error> {
         self.collection.upsert(item).await.map_err(Error::from)
     }
 
@@ -220,7 +220,7 @@ impl FetchState<i32> {
 /// Find result of resource metadata.
 /// Used by [`MemorizedResourceClient`] to determine whether to update the resource,
 /// and return the old resource if it exists.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MetadataFindResult<R: ResourceMetadata> {
     /// this is new
     inner: R,

@@ -1,21 +1,32 @@
+use mongodb::Collection;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use teloxide::{
     payloads::{SendMessageSetters, SendPhotoSetters},
     requests::{Request, Requester},
-    types::{InputFile, Recipient},
+    types::{ChatId, InputFile, MessageId, Recipient},
 };
 
-use crate::Error;
+use crate::{resource::Announcement, Error};
 
 pub struct ChatManager {
     pub bot: teloxide::Bot,
     pub post_recipient: Recipient,
     pub cartoon_recipient: Recipient,
+    pub messages: Collection<SendResult>,
 }
 
+/// Message send result
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendResult {
-    pub url: String,
+    pub url: Option<Url>,
     pub recipient: Recipient,
+    /// Chat id of the recipient, may be the same as `recipient`,
+    /// but we store it for a more stable reference
+    pub chat_id: ChatId,
+    pub message_id: MessageId,
+    pub resource_id: crate::resource::ResourceId,
+    pub update_time: chrono::DateTime<chrono::Utc>,
 }
 
 pub struct Message {
@@ -57,12 +68,27 @@ impl ChatManager {
         Ok(send_result)
     }
 
-    pub async fn send_post<M: Sendable>(
+    pub async fn send_announcement(
         &self,
-        post: &M,
+        post: &Announcement,
     ) -> Result<teloxide::prelude::Message, Error> {
-        self.send_to(post.message(), self.post_recipient.clone())
-            .await
+        let message = self
+            .send_to(post.message(), self.post_recipient.clone())
+            .await?;
+        self.messages
+            .insert_one(
+                SendResult {
+                    recipient: self.post_recipient.clone(),
+                    chat_id: message.chat.id,
+                    resource_id: crate::resource::ResourceId::Announcement(post.id),
+                    update_time: message.date,
+                    message_id: message.id,
+                    url: message.url(),
+                },
+                None,
+            )
+            .await?;
+        Ok(message)
     }
 
     pub async fn send_cartoon<M: Sendable>(

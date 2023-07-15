@@ -1,5 +1,6 @@
 [workspace]
 members = ["priconne", "server"]
+resolver = "2"
 
 [workspace.package]
 authors = ["KiruyaMomochi <KiruyaMomochi@users.noreply.github.com>"]

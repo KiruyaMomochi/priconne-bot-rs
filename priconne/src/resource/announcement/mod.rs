@@ -19,11 +19,11 @@ use serde_with::serde_as;
 
 use super::Region;
 
-// This will finally replaces `SentMessage`.
+/// Announcement resource
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Announcement {
-    /// Post ID.
+    /// Announcement ID.
     /// Can generate by `bson::oid::ObjectId::new()`.
     #[serde(rename = "_id")]
     pub id: bson::oid::ObjectId,
@@ -33,6 +33,11 @@ pub struct Announcement {
     pub region: Region,
     /// Events of post, will update when new data received.
     /// They are [embedded], sicne the number is small.
+    ///
+    /// Events are saved in both here and each [`AnnouncementInsight`],
+    /// when [creating](Announcement::new) a new Announcement or a new
+    /// insight is [pushed](Announcement::push), events in this struct
+    /// will be updated (as for now, replaced).
     ///
     /// [embedded]: https://www.mongodb.com/docs/manual/tutorial/model-embedded-one-to-many-relationships-between-documents/
     pub events: Vec<EventPeriod>,
@@ -45,27 +50,32 @@ pub struct Announcement {
 }
 
 impl Announcement {
-    pub fn new<E>(insight: AnnouncementInsight<E>, events: Vec<EventPeriod>) -> Self
+    pub fn new<E>(insight: AnnouncementInsight<E>, last: Option<Self>) -> Self
     where
         E: Serialize + DeserializeOwned,
     {
-        Self {
-            id: bson::oid::ObjectId::new(),
-            mapped_title: map_title(&insight.title),
-            region: Region::TW,
-            history: None,
-            latest_version: 0,
-            data: vec![insight.into_bson()],
-            events,
+        match last {
+            Some(mut last) => {
+                last.push(insight);
+                last
+            }
+            None => Self {
+                id: bson::oid::ObjectId::new(),
+                mapped_title: map_title(&insight.title),
+                region: Region::TW,
+                history: None,
+                latest_version: 0,
+                events: insight.events.clone(),
+                data: vec![insight.into_bson()],
+            },
         }
     }
 
-    pub fn push<E>(&mut self, insight: AnnouncementInsight<E>, events: Vec<EventPeriod>)
+    pub fn push<E>(&mut self, insight: AnnouncementInsight<E>)
     where
         E: Serialize + DeserializeOwned,
     {
         self.data.push(insight.into_bson());
-        self.events = events;
     }
 }
 
@@ -83,6 +93,8 @@ impl Sendable for Announcement {
 }
 
 pub mod sources {
+    use std::fmt::Display;
+
     use super::*;
 
     // When change serde representations,
@@ -108,6 +120,15 @@ pub mod sources {
             match value {
                 AnnouncementSource::Api(id) => bson::bson!({{"announce"}: id}),
                 AnnouncementSource::Website => bson::bson!("news"),
+            }
+        }
+    }
+
+    impl Display for AnnouncementSource {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                AnnouncementSource::Api(id) => write!(f, "{}: {id}", self.name()),
+                _ => write!(f, "{}", self.name()),
             }
         }
     }
