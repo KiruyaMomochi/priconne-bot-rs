@@ -8,12 +8,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use teloxide::{requests::Requester, types::Recipient};
 use tracing::{event, info, span, Level};
+use url::Url;
 
 use crate::{
     client::FetchStrategy,
     insight::{tagging::RegexTagger, Extractor},
     message::ChatManager,
-    resource::{api::ApiServer, ResourceId},
+    resource::{api::ApiServer, ResourceId, ResourceKind},
     service::PriconneService,
 };
 
@@ -79,7 +80,7 @@ pub struct TelegraphConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServerConfig {
-    pub news: String,
+    pub news: Url,
     pub api: Vec<ApiServer>,
 }
 
@@ -137,6 +138,12 @@ impl TaggerConfig {
             }
         }
         Ok(RegexTagger { tag_rules })
+    }
+}
+
+impl ServerConfig {
+    pub fn api_server_by_id(&self, id: &str) -> Option<&ApiServer> {
+        self.api.iter().filter(|x| x.id == id).nth(0)
     }
 }
 
@@ -222,11 +229,11 @@ impl TelegramConfig {
 }
 
 impl StrategyConfig {
-    pub fn build_for(&self, resource: &str) -> FetchStrategy {
+    pub fn build_for(&self, kind: ResourceKind) -> FetchStrategy {
         // let name = resource.name().to_owned();
-        let name = resource;
+        let name = kind.to_string();
         let mut result = self.base.clone();
-        if let Some(over) = self.overrides.get(name) {
+        if let Some(over) = self.overrides.get(&name) {
             result = result.override_by(over)
         }
 

@@ -3,10 +3,7 @@ use priconne::{
     built_info,
     client::{MemorizedResourceClient, ResourceClient},
     config::PriconneConfig,
-    resource::{
-        api::ApiClient,
-        cartoon::service::{self, CartoonService},
-    },
+    resource::api::ApiClient,
     service::{PriconneService, ResourceService},
 };
 use schemars::schema_for;
@@ -64,19 +61,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = std::fs::File::open("config.yaml")?;
     let config: PriconneConfig = serde_yaml::from_reader(config)?;
     let priconne = config.build().await?;
-
-    let client = ApiClient {
-        client: priconne.client.clone(),
-        api_server: priconne.config.server.api[0].clone(),
-    };
-    let mut straegy = priconne.config.strategy.build_for("information");
-    straegy.ignore_time_lt = Some(chrono::Utc::now() - chrono::Duration::days(1));
-    let memorized = client.memorize(
-        // collection: priconne.database.collection("api_cache").into(),
-        priconne.database.collection("api_cache"),
-        straegy,
-    );
-    priconne.serve_and_work(memorized).await?;
 
     // let _api = ApiServer {
     //     id: "PROD1".to_string(),

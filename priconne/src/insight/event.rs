@@ -4,7 +4,7 @@ use kuchikiki::{traits::NodeIterator, ElementData, NodeDataRef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct EventPeriod {
+pub struct EventInAnnouncement {
     #[serde(with = "mongodb::bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub start: DateTime<Utc>,
     #[serde(with = "mongodb::bson::serde_helpers::chrono_datetime_as_bson_datetime")]
@@ -31,7 +31,7 @@ fn parse_period(period_str: &str) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
     Some((start, end))
 }
 
-pub fn get_events(content_node: &NodeDataRef<ElementData>) -> Vec<EventPeriod> {
+pub fn get_events(content_node: &NodeDataRef<ElementData>) -> Vec<EventInAnnouncement> {
     let mut periods = Vec::new();
 
     let iter = content_node.as_node().descendants().text_nodes();
@@ -48,7 +48,7 @@ pub fn get_events(content_node: &NodeDataRef<ElementData>) -> Vec<EventPeriod> {
         let name = name.trim_start_matches('■');
 
         if let Some((start, end)) = parse_period(time) {
-            periods.push(EventPeriod {
+            periods.push(EventInAnnouncement {
                 start,
                 end,
                 title: name.to_string(),

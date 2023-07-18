@@ -1,7 +1,7 @@
 use crate::{
     client::{MemorizedResourceClient, MetadataFindResult, ResourceClient, ResourceResponse},
     database::AnnouncementCollection,
-    insight::{AnnouncementInsight, AnnouncementPage, EventPeriod},
+    insight::{AnnouncementInsight, AnnouncementPage, EventInAnnouncement},
     resource::{sources::AnnouncementSource, Announcement, ResourceMetadata},
     service::{PriconneService, ResourceService},
     Error,

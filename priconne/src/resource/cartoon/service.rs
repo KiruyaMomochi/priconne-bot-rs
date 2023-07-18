@@ -10,17 +10,19 @@ use reqwest::Url;
 
 use super::{Cartoon, Thumbnail};
 
-pub struct CartoonService {
-    pub client: MemorizedResourceClient<Thumbnail, ApiClient>,
-}
+// pub struct CartoonService {
+//     pub client: ,
+// }
 
 #[async_trait]
-impl ResourceService<MetadataFindResult<Thumbnail>> for CartoonService {
+impl ResourceService<MetadataFindResult<Thumbnail>>
+    for MemorizedResourceClient<Thumbnail, ApiClient>
+{
     async fn collect_latests(
         &self,
         _priconne: &PriconneService,
     ) -> Result<Vec<MetadataFindResult<Thumbnail>>, Error> {
-        self.client.latests().await
+        self.latests().await
     }
     async fn work(
         &self,

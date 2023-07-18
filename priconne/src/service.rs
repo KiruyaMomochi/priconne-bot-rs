@@ -5,12 +5,18 @@
 //! fetching and parsing data, and sending messages using [`ChatManager`].
 
 use async_trait::async_trait;
+use futures::{stream, FutureExt, StreamExt, TryStreamExt};
+use mongodb::bson::doc;
 
 use crate::{
+    client::{MemorizedResourceClient, ResourceClient},
     config::FetchConfig,
+    database::AnnouncementCollection,
     error::Error,
-    insight::{tagging::RegexTagger, Extractor},
+    insight::{tagging::RegexTagger, EventInAnnouncement, Extractor},
     message::ChatManager,
+    resource::{api::ApiClient, event::Event, news::service::NewsClient, ResourceKind},
+    Result,
 };
 
 // pub trait ServiceBuilder {
@@ -30,9 +36,9 @@ use crate::{
 #[async_trait]
 pub trait ResourceService<M> {
     /// Collect latest metadata
-    async fn collect_latests(&self, priconne: &PriconneService) -> Result<Vec<M>, Error>;
+    async fn collect_latests(&self, priconne: &PriconneService) -> Result<Vec<M>>;
     /// For any given metadata, extract data from it
-    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<(), Error>
+    async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<()>
     where
         M: 'async_trait;
 }
@@ -67,7 +73,7 @@ impl PriconneService {
         telegraph: telegraph_rs::Telegraph,
         client: reqwest::Client,
         config: FetchConfig,
-    ) -> Result<PriconneService, Error> {
+    ) -> Result<PriconneService> {
         let extractor = Extractor {
             tagger: RegexTagger { tag_rules: vec![] },
         };
@@ -82,13 +88,96 @@ impl PriconneService {
         })
     }
 
-    pub async fn serve_and_work<M>(&self, service: impl ResourceService<M>) -> Result<(), Error> {
+    pub async fn serve_and_work<M>(&self, service: impl ResourceService<M>) -> Result<()> {
         let latests = service.collect_latests(self).await;
 
         for result in latests? {
             service.work(self, result).await?;
         }
         Ok(())
+    }
+
+    fn build_api_client(&self) -> ApiClient {
+        ApiClient {
+            client: self.client.clone(),
+            api_server: self.config.server.api[0].clone(),
+        }
+    }
+
+    fn build_news_client(&self) -> NewsClient {
+        NewsClient {
+            client: self.client.clone(),
+            server: self.config.server.news.clone(),
+        }
+    }
+
+    pub async fn run_service(&self, kind: ResourceKind) -> Result<()> {
+        match kind {
+            ResourceKind::Announce => {
+                let api_client = self.build_api_client().memorize(
+                    self.database
+                        .collection::<crate::resource::information::Announce>(&kind.to_string()),
+                    self.config.strategy.build_for(kind),
+                );
+                self.serve_and_work(api_client).await?
+            }
+            ResourceKind::News => {
+                let news_client = self.build_news_client().memorize(
+                    self.database.collection(&kind.to_string()),
+                    self.config.strategy.build_for(kind),
+                );
+                self.serve_and_work(news_client).await?
+            }
+            ResourceKind::Cartoon => {
+                let api_client = self.build_api_client().memorize(
+                    self.database
+                        .collection::<crate::resource::cartoon::Thumbnail>(&kind.to_string()),
+                    self.config.strategy.build_for(kind),
+                );
+                self.serve_and_work(api_client).await?
+            }
+            _ => todo!(),
+        };
+
+        Ok(())
+    }
+
+    /// List all incoming events
+    /// TODO: This currently queries the announcement resource. In the future, we will have a dedicated
+    /// event collection.
+    pub async fn incomming_events(&self) -> Result<Vec<Event>> {
+        let collection = AnnouncementCollection(self.database.collection("announcement")).0;
+        let announcements = collection
+            .find(
+                doc! {
+                    "events.end": {
+                        "$gt": chrono::Utc::now() - chrono::Duration::days(2)
+                    }
+                },
+                None,
+            )
+            .await?;
+
+        Ok(announcements
+            .try_filter_map(|a| async move {
+                Ok(Some(
+                    a.events
+                        .into_iter()
+                        .map(move |e| {
+                            Event {
+                                start: e.start,
+                                end: e.end,
+                                kind: crate::resource::event::EventKind::Other, // TODO: This is a placeholder
+                                title: e.title,
+                                announcement_id: a.id,
+                                announcement_title: a.data.last().unwrap().title.clone(),
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                ))
+            })
+            .try_concat()
+            .await?)
     }
 }
 

@@ -28,8 +28,6 @@ enum TelegramCommand {
     ArticleAll,
     #[command(description = "send all news.")]
     NewsAll,
-    #[command(description = "stop.")]
-    Shutdown,
 }
 
 fn init_logging() {

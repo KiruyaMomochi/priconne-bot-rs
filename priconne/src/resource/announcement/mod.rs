@@ -2,13 +2,14 @@
 //!
 //! Client that can fetch announcements should implement [`AnnouncementClient`] trait.
 
+pub mod event;
 pub mod information;
 pub mod news;
 pub mod service;
 
 use crate::{
     client::ResourceResponse,
-    insight::{AnnouncementInsight, AnnouncementPage, EventPeriod},
+    insight::{AnnouncementInsight, AnnouncementPage, EventInAnnouncement},
     message::Sendable,
     utils::map_title,
 };
@@ -40,7 +41,7 @@ pub struct Announcement {
     /// will be updated (as for now, replaced).
     ///
     /// [embedded]: https://www.mongodb.com/docs/manual/tutorial/model-embedded-one-to-many-relationships-between-documents/
-    pub events: Vec<EventPeriod>,
+    pub events: Vec<EventInAnnouncement>,
     /// History post ID.
     pub history: Option<bson::oid::ObjectId>,
     /// Latest version

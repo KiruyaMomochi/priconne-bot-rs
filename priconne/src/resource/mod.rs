@@ -18,6 +18,8 @@ pub mod announcement;
 pub mod api;
 pub mod cartoon;
 pub mod glossary;
+use std::fmt::Display;
+
 pub use announcement::*;
 use mongodb::bson;
 
@@ -52,6 +54,28 @@ pub enum ResourceId {
     Cartoon(i32),
 }
 
+/// Kind of a resource, the difference from [`ResourceId`] is that
+/// this type does not have any fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceKind {
+    Announce,
+    News,
+    Cartoon,
+    Unknown,
+}
+
+impl Display for ResourceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ResourceKind::Announce => "announce",
+            ResourceKind::News => "news",
+            ResourceKind::Cartoon => "cartoon",
+            ResourceKind::Unknown => return Err(std::fmt::Error),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Metadata for a resource
 pub trait ResourceMetadata
 where
@@ -60,6 +84,14 @@ where
     fn id(&self) -> i32;
     fn title(&self) -> &str;
     fn update_time(&self) -> DateTime<Utc>;
+
+    /// The [`ResourceKind`] for this client
+    /// This is required to not use a plain literial string
+    /// when creating connection to memorize database.
+    /// May have better implementation.
+    fn kind(&self) -> ResourceKind {
+        ResourceKind::Unknown
+    }
 
     // TODO: change to `compare` and return `Ordering` instead
     fn is_update(&self, other: &Self) -> bool;

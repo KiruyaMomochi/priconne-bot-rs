@@ -3,7 +3,7 @@ pub mod tagging;
 
 use std::fmt::Debug;
 
-pub use event::{get_events, EventPeriod};
+pub use event::{get_events, EventInAnnouncement};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use linked_hash_set::LinkedHashSet;
@@ -40,7 +40,7 @@ pub struct AnnouncementInsight<E> {
     /// Events in the announcement.
     /// The current design is save a different events vector for each announcement.
     /// The latest saved events will be used when building message.
-    pub events: Vec<EventPeriod>,
+    pub events: Vec<EventInAnnouncement>,
     pub extra: E,
 }
 
@@ -142,7 +142,7 @@ pub trait AnnouncementPage {
     fn tags(&self, tagger: &RegexTagger) -> LinkedHashSet<String> {
         tagger.tag_title(&self.title())
     }
-    fn events(&self) -> Vec<EventPeriod> {
+    fn events(&self) -> Vec<EventInAnnouncement> {
         get_events(&self.content().into_element_ref().unwrap())
     }
 }
