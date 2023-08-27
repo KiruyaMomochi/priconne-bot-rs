@@ -1,56 +1,8 @@
 [workspace]
-members = ["priconne", "server"]
+members = ["priconne"]
 resolver = "2"
 
 [workspace.package]
 authors = ["KiruyaMomochi <KiruyaMomochi@users.noreply.github.com>"]
 version = "0.3.0"
 edition = "2021"
-
-[workspace.dependencies]
-
-# Async
-async-trait = "0.1"
-futures = "0.3.15"
-tokio = { version = "1.8.1", features = ["rt-multi-thread", "macros", "sync"] }
-tokio-stream = "0.1.7"
-
-# Logging and Tracing
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-log = "0.1"
-tracing-futures = "0.2"
-
-# Parsing
-kuchikiki = "0.8.2"
-html5ever = "0.26.0" # Version required by kuchiki
-regex = "1"
-toml = "0.5.8"
-url = "2.2.2"
-
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.64"
-serde_yaml = "0.9.2"
-serde_with = "^1" # serde_with v1 required by bson crate
-
-# Service
-http = "0.2.4"
-mongodb = { version = "2.3.0", features = ["bson-chrono-0_4", "bson-serde_with"] }
-warp = "0.3.2"
-reqwest = "0.11.4"
-
-telegraph-rs = { git = "https://github.com/KiruyaMomochi/telegraph-rs" }
-teloxide = { version = "0.12.0", features = ["auto-send", "macros"] }
-tokio-cron-scheduler = { git = "https://github.com/KiruyaMomochi/tokio-cron-scheduler", branch = "ext-cron" }
-
-# Misc
-chrono = { version = "0.4.19", default-features = false, features = [
-    "clock",
-    "serde",
-] }
-cron = "0.12.0"
-thiserror = "1.0"
-linked_hash_set = { version="0.1.4", features = ["serde"] }
-
-# Build time dependencies
-built = "0.5"

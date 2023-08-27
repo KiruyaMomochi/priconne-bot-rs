@@ -6,15 +6,15 @@ use std::collections::HashMap;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use teloxide::{requests::Requester, types::Recipient};
-use tracing::{event, info, span, Level};
+use teloxide::types::Recipient;
+use tracing::info;
 use url::Url;
 
 use crate::{
+    chat::ChatManager,
     client::FetchStrategy,
     insight::{tagging::RegexTagger, Extractor},
-    message::ChatManager,
-    resource::{api::ApiServer, ResourceId, ResourceKind},
+    resource::{api::ApiServer, ResourceKind},
     service::PriconneService,
 };
 
@@ -220,11 +220,23 @@ impl TelegramConfig {
         client: reqwest::Client,
     ) -> Result<teloxide::Bot, crate::Error> {
         let bot = teloxide::Bot::with_client(self.token.to_owned(), client);
-        if let Some(url) = &self.webhook_url {
-            let url = reqwest::Url::parse(url)?;
-            bot.set_webhook(url).await?;
-        }
         Ok(bot)
+    }
+
+    pub async fn build_webhook_options(
+        &self,
+    ) -> Option<crate::Result<teloxide::dispatching::update_listeners::webhooks::Options>> {
+        self.listen_addr
+            .clone()
+            .zip(self.webhook_url.clone())
+            .map(|(addr, url)| {
+                Ok(
+                    teloxide::dispatching::update_listeners::webhooks::Options::new(
+                        addr.parse()?,
+                        url.parse()?,
+                    ),
+                )
+            })
     }
 }
 
@@ -249,20 +261,16 @@ impl PriconneConfig {
         let bot = self.telegram.with_client(client.clone()).await?;
         let tagger = self.tags.build()?;
         let extractor = Extractor { tagger };
+        let config = self.fetch.clone();
+        let chat_manager = ChatManager {
+            bot,
+            config: self.telegram.clone(),
+            post_recipient: self.telegram.recipient.post.clone(),
+            cartoon_recipient: self.telegram.recipient.cartoon.clone(),
+            messages: database.collection("messages"),
+        };
 
-        Ok(PriconneService {
-            telegraph,
-            client,
-            config: self.fetch.clone(),
-            extractor,
-            chat_manager: ChatManager {
-                bot,
-                post_recipient: self.telegram.recipient.post.clone(),
-                cartoon_recipient: self.telegram.recipient.cartoon.clone(),
-                messages: database.collection("messages"),
-            },
-            database,
-        })
+        PriconneService::new(database, chat_manager, telegraph, client, config, extractor)
     }
 }
 

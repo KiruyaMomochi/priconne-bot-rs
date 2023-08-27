@@ -75,13 +75,14 @@ where
         let result = self
             .compared_stream()
             .try_take_while(move |update| {
+                let keep_going = fetch_state.keep_going(update);
                 tracing::trace!(
-                    "id = {}, new: {}, update: {}",
+                    "id = {}, new: {}, update: {}. keep_going: {keep_going}",
                     update.item().id(),
                     update.is_new(),
                     update.is_update()
                 );
-                future::ok(fetch_state.keep_going(update.item(), update.is_update()))
+                future::ok(keep_going)
             })
             .try_filter(|update| future::ready(update.is_not_same()));
 
@@ -170,41 +171,55 @@ impl FetchState<i32> {
         }
     }
 
-    pub fn keep_going<R: ResourceMetadata>(&mut self, resource: &R, is_update: bool) -> bool {
-        let id = resource.id();
-        let update_time = resource.update_time();
+    pub fn keep_going<M: ResourceMetadata>(&mut self, found: &MetadataFindResult<M>) -> bool {
+        let metadata = found.item();
+        let id = metadata.id();
+        let update_time = metadata.update_time();
 
-        let mut keep_going = true;
+        // For fuse_count calculating
+        let mut in_range = true;
+
+        // If id should be ignored
         if let Some(ignore_id_lt) = self.strategy.ignore_id_lt {
             if id < ignore_id_lt {
-                keep_going = false;
+                tracing::trace!("{id} < {ignore_id_lt}");
+                in_range = false;
             }
         }
+
+        // If send time is older than limit
         if let Some(ignore_time_lt) = self.strategy.ignore_time_lt {
             if update_time < ignore_time_lt {
-                keep_going = false;
+                tracing::trace!("{update_time} < {ignore_time_lt}");
+                in_range = false;
             }
         }
+
+        // If there is no fuse limit, we will not stop until out of range
         if self.strategy.fuse_limit.is_none() {
-            return keep_going;
+            return in_range;
         }
 
-        if !is_update {
-            self.fuse_count += 1;
-        }
-        if keep_going {
+        if found.is_same() {
+            // If articles are the same, just add fuse count.
+            self.fuse_count += 1
+        } else if in_range {
+            // Only reset the count if in range
+            // When out of range, no fuse_count reset is performed
             self.fuse_count = 0;
         } else {
+            // But if not in range anymore, add fuse count too!
             self.fuse_count += 1;
         }
 
-        let result = self.fuse_count < self.strategy.fuse_limit.unwrap_or(0);
+        let result = self.fuse_count <= self.strategy.fuse_limit.unwrap_or(0);
         tracing::debug!(
-            "id: {}/{:?}, fuse: {}/{:?}",
+            "id: {}/{:?}, fuse: {}/{:?}, is_same: {}",
             id,
             self.strategy.ignore_id_lt,
             self.fuse_count,
-            self.strategy.fuse_limit
+            self.strategy.fuse_limit,
+            found.is_same(),
         );
         result
     }

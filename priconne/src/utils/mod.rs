@@ -42,7 +42,7 @@ pub fn string_to_date(
     string: &str,
     format: &str,
 ) -> Result<DateTime<FixedOffset>, chrono::ParseError> {
-    let offset: chrono::FixedOffset = chrono::FixedOffset::east(8 * HOUR);
+    let offset: chrono::FixedOffset = chrono::FixedOffset::east_opt(8 * HOUR).unwrap();
 
     let datetime = offset.datetime_from_str(string, format)?;
     Ok(datetime)
@@ -100,28 +100,6 @@ pub mod chrono_date_utc8_as_bson_datetime {
         let timezone = chrono::FixedOffset::east_opt(8 * HOUR).unwrap();
         let datetime = DateTime::from_chrono(datetime.and_local_timezone(timezone).unwrap());
         datetime.serialize(serializer)
-    }
-}
-
-pub mod serde_as_string {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::str::FromStr;
-
-    pub fn deserialize<'de, D, T: FromStr>(deserializer: D) -> Result<T, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let string = String::deserialize(deserializer)?;
-        let number = string.parse::<T>();
-        number.map_err(|_| serde::de::Error::custom("failed to parse string"))
-    }
-
-    pub fn serialize<S, T: ToString>(val: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let string = val.to_string();
-        string.serialize(serializer)
     }
 }
 
@@ -192,7 +170,7 @@ pub fn replace_relative_path(
 /// Create mapped title that not changeed by square bracket or update information.
 pub fn map_title(title: &str) -> String {
     let title = title.trim();
-    let regex = Regex::new(r#"^\s*(【.+?】)?\s*(.+?)\s*(\(.+更新\))?\s*$"#).unwrap();
+    let regex = Regex::new(r"^\s*(【.+?】)?\s*(.+?)\s*(\(.+更新\))?\s*$").unwrap();
     let title = regex.replace(title, "$2");
 
     title.to_string()

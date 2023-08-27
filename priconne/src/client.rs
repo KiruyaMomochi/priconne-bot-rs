@@ -13,11 +13,11 @@
 //! Only new resources will be fetched and parsed.
 
 use async_trait::async_trait;
-use futures::{future, stream::BoxStream, StreamExt, TryStreamExt};
+use futures::stream::BoxStream;
 use mongodb::{bson::doc, Collection};
 
 use crate::{
-    database::ResourceMetadataCollection, message::Sendable, resource::ResourceMetadata, Error,
+    chat::Sendable, database::ResourceMetadataCollection, resource::ResourceMetadata, Error,
 };
 
 /// Types for [`MemorizedResourceClient`].

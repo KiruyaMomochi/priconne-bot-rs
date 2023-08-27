@@ -22,6 +22,16 @@ pub enum Error {
     RegexError(#[from] regex::Error),
     #[error("cron error")]
     CronError(#[from] tokio_cron_scheduler::JobSchedulerError),
+    #[error("addr parse error")]
+    AddrParseError(#[from] std::net::AddrParseError),
+    #[error("axum error")]
+    AxumError(#[from] axum::Error),
+    #[error("hyper error")]
+    HyperError(#[from] hyper::Error),
+    #[error("IO Error")]
+    IOError(#[from] std::io::Error),
+    #[error("serde_yaml Error")]
+    SerdeYamlError(#[from] serde_yaml::Error),
     #[error("tokio cron `{0}` error")]
     SendError(String),
     #[error("kuchikiki error")]
@@ -30,8 +40,10 @@ pub enum Error {
     NoApiServer,
     #[error("the article has no title")]
     EmptyTitleError,
-    #[error("Source is invalid")]
+    #[error("source is invalid")]
     InvalidSource,
+    #[error("failed to parse string to resource kind {0}")]
+    ParseResourceKindsError(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

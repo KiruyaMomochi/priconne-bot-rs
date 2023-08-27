@@ -3,5 +3,7 @@
 /.direnv
 /.devenv
 /mongodb
+/result
 *.bkp
 .pre-commit-config.yaml
+.vscode/launch.json

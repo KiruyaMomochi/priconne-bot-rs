@@ -1711,12 +1711,17 @@ version = "0.3.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "axum",
+ "axum-core",
  "built",
  "chrono",
  "clap",
+ "cron",
+ "dptree",
  "futures",
  "html5ever",
  "http",
+ "hyper",
  "kuchikiki",
  "linked_hash_set",
  "mongodb",
@@ -1732,10 +1737,12 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-cron-scheduler",
+ "toml",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -2325,22 +2332,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-core",
- "serde",
- "serde_json",
- "teloxide",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -3075,9 +3066,9 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "uuid"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d023da39d1fde5a8a3fe1f3e01ca9632ada0a63e9797de55a879d6e2236277be"
+checksum = "79daa5ed5740825c40b389c5e50312b9c86df53fccd33f281df655642b43869d"
 dependencies = [
  "getrandom 0.2.10",
  "serde",

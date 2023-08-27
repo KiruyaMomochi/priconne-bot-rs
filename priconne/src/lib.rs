@@ -7,10 +7,10 @@ mod utils;
 
 pub mod database;
 
+pub mod chat;
 pub mod client;
 pub mod config;
 pub mod insight;
-pub mod message;
 pub mod service;
 
 pub mod resource;

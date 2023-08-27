@@ -1,13 +1,13 @@
 use crate::{
     client::{MemorizedResourceClient, MetadataFindResult, ResourceClient, ResourceResponse},
     database::AnnouncementCollection,
-    insight::{AnnouncementInsight, AnnouncementPage, EventInAnnouncement},
+    insight::AnnouncementPage,
     resource::{sources::AnnouncementSource, Announcement, ResourceMetadata},
     service::{PriconneService, ResourceService},
     Error,
 };
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+
 use std::fmt::Debug;
 use tracing::{debug, instrument, trace};
 
@@ -83,6 +83,7 @@ where
     T: MemorizedAnnouncementClient<M>,
 {
     /// Collect latest metadata
+    #[instrument(skip_all, fields(source = %self.source()))]
     async fn collect_latests(
         &self,
         _priconne: &PriconneService,
@@ -92,7 +93,10 @@ where
 
     /// Add a new information resource to post collection, extract data and send if needed
     /// This is the main entry point of the service
-    #[instrument(skip(self, priconne), fields(source = %self.source()))]
+    #[instrument(skip_all, fields(
+        source = %self.source(),
+        metadata.id = metadata.item().id(),
+        metadata.title = metadata.item().title()))]
     async fn work(
         &self,
         priconne: &PriconneService,
@@ -125,13 +129,16 @@ where
         };
 
         // extract data
-        // TODO: telegraph patch in utils
-        let telegraph = priconne
-            .telegraph
-            .create_page(&insight.title, &content.unwrap(), false)
-            .await?;
+        if decision.should_telegraph() {
+            // TODO: telegraph patch in utils
+            let telegraph = priconne
+                .telegraph
+                .create_page(&insight.title, &content.unwrap(), false)
+                .await?;
 
-        insight.telegraph_url = Some(telegraph.url);
+            insight.telegraph_url = Some(telegraph.url);
+        }
+
         trace!("{insight:?}");
         let announcement = Announcement::new(insight, found);
 
@@ -143,6 +150,7 @@ where
             trace!("message sent: {:?}", message.url());
         };
 
+        // TODO: Graceful Shutdown
         self.upsert_metadata(metadata.item()).await?;
         announcements.upsert(&announcement).await?;
 
@@ -157,11 +165,6 @@ pub struct AnnouncementDecision {
     pub action: Action,
     /// Source of item
     pub source: AnnouncementSource,
-    announcement_found: bool,
-    // /// Item in database before fetch
-    // pub resource: &'a MetadataFindResult<R>,
-    // /// Post item
-    // pub announcement: &'a Option<Announcement>,
 }
 
 /// Action to take
@@ -179,21 +182,19 @@ pub enum Action {
 
 impl AnnouncementDecision {
     pub fn should_request(&self) -> bool {
-        match self.action {
-            Action::None => false,
-            _ => true,
-        }
+        !matches!(self.action, Action::None)
     }
 
     pub fn send_post_and_continue(&self) -> bool {
-        match self.action {
-            Action::Send => true,
-            _ => false,
-        }
+        matches!(self.action, Action::Send)
+    }
+
+    pub fn should_telegraph(&self) -> bool {
+        !matches!(self.action, Action::Send)
     }
 }
 
-/// TODO: random write, may all wrong
+// TODO: random write, may all wrong
 impl AnnouncementDecision {
     pub fn new<R: ResourceMetadata + Debug>(
         source: &AnnouncementSource,
@@ -201,13 +202,12 @@ impl AnnouncementDecision {
         found: &Option<Announcement>,
     ) -> Self {
         Self {
-            action: Self::get_action(&source, &find_result, &found),
+            action: Self::get_action(source, find_result, found),
             source: source.clone(),
-            announcement_found: found.is_some(),
         }
     }
 
-    #[instrument]
+    #[instrument(skip(resource, post))]
     fn get_action<R: ResourceMetadata + Debug>(
         source: &AnnouncementSource,
         resource: &MetadataFindResult<R>,
@@ -245,7 +245,7 @@ impl AnnouncementDecision {
             return Action::Edit;
         }
 
-        debug!("old post has same source, but current one is newer. edit the old message");
+        debug!("no action needed");
         Action::None
     }
 }

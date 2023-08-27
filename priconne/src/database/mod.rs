@@ -2,7 +2,7 @@
 
 use mongodb::{
     bson::doc,
-    options::{FindOneAndReplaceOptions, FindOneOptions},
+    options::{FindOneAndReplaceOptions, FindOneOptions, ReplaceOptions},
     Collection,
 };
 
@@ -39,7 +39,13 @@ impl AnnouncementCollection {
         source: &AnnouncementSource,
     ) -> Result<Option<Announcement>, mongodb::error::Error> {
         let mapped = map_title(title);
-        let in24hours = chrono::Utc::now() - chrono::Duration::hours(24);
+        // it's possible that different announcements have a same title,
+        // espicially for a common event, therefore, we try our best to avoid duplicated re-posting
+        // currently, this case are considered as repost:
+        //   same mapped title, same source not exist
+        // however, on some cases they may actually be two different posts...
+        // we can't know unless comparing full-text
+
         // let source_field = &format!("source.{}", source.name());
         let filter = doc! {
             "$or": [
@@ -48,9 +54,6 @@ impl AnnouncementCollection {
                     "data.source": {
                         "$ne": source
                     },
-                    "update_time": {
-                        "$gte": in24hours
-                    },
                 },
                 {
                     "data.source": source,
@@ -58,7 +61,7 @@ impl AnnouncementCollection {
                 }
             ]
         };
-        tracing::trace!("{filter:?}");
+        tracing::trace!("{filter}");
 
         self.posts()
             .find_one(
@@ -73,8 +76,14 @@ impl AnnouncementCollection {
     pub async fn upsert(
         &self,
         post: &Announcement,
-    ) -> Result<mongodb::results::InsertOneResult, mongodb::error::Error> {
-        self.posts().insert_one(post, None).await
+    ) -> Result<mongodb::results::UpdateResult, mongodb::error::Error> {
+        self.posts()
+            .replace_one(
+                doc! {"_id": post.id},
+                post,
+                ReplaceOptions::builder().upsert(true).build(),
+            )
+            .await
     }
 }
 

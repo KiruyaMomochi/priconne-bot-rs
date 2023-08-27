@@ -5,32 +5,71 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
-async-trait.workspace = true
-chrono.workspace = true
-futures.workspace = true
-html5ever.workspace = true
-http.workspace = true
-kuchikiki.workspace = true
-linked_hash_set.workspace = true
-mongodb.workspace = true
-regex.workspace = true
-reqwest.workspace = true
-serde_json.workspace = true
-serde_with.workspace = true
-serde_yaml.workspace = true
-serde.workspace = true
-telegraph-rs.workspace = true
-teloxide.workspace = true
-thiserror.workspace = true
-tokio-cron-scheduler.workspace = true
-tokio.workspace = true
-tracing-log.workspace = true
-tracing-subscriber.workspace = true
-tracing.workspace = true
-url.workspace = true
+
+# Async
+async-trait = "0.1"
+futures = "0.3.15"
+tokio = { version = "1.8.1", features = ["rt-multi-thread", "macros", "sync"] }
 async-stream = "0.3.4"
+
+# Logging and Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "tracing-log",
+] }
+tracing-log = "0.1"
+
+# Parsing
+kuchikiki = "0.8.2"
+html5ever = "0.26.0" # Version required by kuchiki
+regex = "1"
+toml = "0.5.8"
+url = "2.2.2"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.64"
+serde_yaml = "0.9.2"
+serde_with = "^1"                                  # serde_with v1 required by bson crate
+
+# Service
+http = "0.2.4"
+mongodb = { version = "2.3.0", features = [
+    "bson-chrono-0_4",
+    "bson-serde_with",
+] }
+axum = "0.6.4"
+axum-core = "0.3.2"
+reqwest = "0.11.4"
+hyper = "0.14.27"
+
+telegraph-rs = { git = "https://github.com/KiruyaMomochi/telegraph-rs" }
+teloxide = { version = "0.12.0", features = [
+    "auto-send",
+    "macros",
+    "webhooks-axum",
+] }
+dptree = "0.3.0"
+
+tokio-cron-scheduler.git = "https://github.com/KiruyaMomochi/tokio-cron-scheduler"
+tokio-cron-scheduler.branch = "ext-cron"
+tokio-cron-scheduler.features = ["signal"]
+
+# Misc
+chrono = { version = "0.4.19", default-features = false, features = [
+    "clock",
+    "serde",
+] }
+cron = "0.12.0"
+thiserror = "1.0"
+linked_hash_set = { version = "0.1.4", features = ["serde"] }
+
 schemars = { version = "0.8.12", features = ["url", "chrono"] }
 clap = { version = "4.3.1", features = ["derive"] }
+uuid = "1.4.1"
 
+# Added by cargo command
+
+# Build time dependencies
 [build-dependencies]
-built.workspace = true
+built = "0.5"

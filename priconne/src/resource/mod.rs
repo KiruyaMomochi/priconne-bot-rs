@@ -18,16 +18,12 @@ pub mod announcement;
 pub mod api;
 pub mod cartoon;
 pub mod glossary;
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 pub use announcement::*;
 use mongodb::bson;
 
-use crate::{
-    client::{MemorizedResourceClient, ResourceClient},
-    service::PriconneService,
-    utils::HOUR,
-};
+use crate::utils::HOUR;
 use chrono::{DateTime, FixedOffset, Utc};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -58,16 +54,37 @@ pub enum ResourceId {
 /// this type does not have any fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceKind {
-    Announce,
+    Information,
     News,
     Cartoon,
     Unknown,
 }
 
+const RESOURCE_KINDS: [ResourceKind; 3] = [
+    ResourceKind::Information,
+    ResourceKind::News,
+    ResourceKind::Cartoon,
+];
+
+impl FromStr for ResourceKind {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let kind = match s {
+            "information" => ResourceKind::Information,
+            "news" => ResourceKind::News,
+            "cartoon" => ResourceKind::Cartoon,
+            s => Err(crate::Error::ParseResourceKindsError(s.to_string()))?,
+        };
+
+        Ok(kind)
+    }
+}
+
 impl Display for ResourceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ResourceKind::Announce => "announce",
+            ResourceKind::Information => "information",
             ResourceKind::News => "news",
             ResourceKind::Cartoon => "cartoon",
             ResourceKind::Unknown => return Err(std::fmt::Error),

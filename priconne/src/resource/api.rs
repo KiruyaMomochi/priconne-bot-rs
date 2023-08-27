@@ -2,7 +2,7 @@
 //! `api` contains the client for the official Princess Connect! Re:Dive API.
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
+use futures::{stream::BoxStream, Stream, TryStreamExt};
 
 use reqwest::{Response, Url};
 use schemars::JsonSchema;

@@ -4,35 +4,29 @@
 //! this service layer is responsible for managing the resources, continuously
 //! fetching and parsing data, and sending messages using [`ChatManager`].
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
-use futures::{stream, FutureExt, StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use mongodb::bson::doc;
+use tokio_cron_scheduler::{Job, JobScheduler};
 
 use crate::{
-    client::{MemorizedResourceClient, ResourceClient},
+    chat::ChatManager,
+    client::ResourceClient,
     config::FetchConfig,
     database::AnnouncementCollection,
-    error::Error,
-    insight::{tagging::RegexTagger, EventInAnnouncement, Extractor},
-    message::ChatManager,
+    insight::Extractor,
     resource::{api::ApiClient, event::Event, news::service::NewsClient, ResourceKind},
     Result,
 };
 
-// pub trait ServiceBuilder {
-//     type Metadata: ResourceMetadata;
-//     type CollectionService: ResourceCollectionService<Self::Metadata>;
-//     type Service: ResourceService<Self::Metadata>;
-//     fn build_collection_service(&self, priconne: &PriconneService) -> Self::CollectionService;
-//     fn build_service(&self, priconne: &PriconneService) -> Self::Service;
-// }
-
+// TODO: We may need to housekeeping the database.
 /// Resource collection is generalized to two steps, as in this trait.
 ///
 /// 1. Get metadata from remote
 /// 2. Fetch full content of metadata (if required), send a chat and insert them into database.
 ///
-/// TODO: We need to housekeep the database.
 #[async_trait]
 pub trait ResourceService<M> {
     /// Collect latest metadata
@@ -43,6 +37,7 @@ pub trait ResourceService<M> {
         M: 'async_trait;
 }
 
+// TODO: Since these values are cloned, we may want to use `Arc` instead. Or their mutation may not be reflected.
 /// Central service for Priconne resource management.
 /// It contains all the resources and their corresponding services.
 ///
@@ -56,6 +51,8 @@ pub trait ResourceService<M> {
 /// pub information_service: ResourceService<Announce, ApiClient>,
 /// pub cartoon_service: ResourceService<Thumbnail, ApiClient>,
 /// ```
+///
+#[derive(Clone)]
 pub struct PriconneService {
     pub database: mongodb::Database,
     pub telegraph: telegraph_rs::Telegraph,
@@ -63,7 +60,7 @@ pub struct PriconneService {
     pub client: reqwest::Client,
     pub config: FetchConfig,
     pub extractor: Extractor,
-    pub chat_manager: ChatManager,
+    pub chat_manager: Arc<ChatManager>,
 }
 
 impl PriconneService {
@@ -73,10 +70,9 @@ impl PriconneService {
         telegraph: telegraph_rs::Telegraph,
         client: reqwest::Client,
         config: FetchConfig,
+        extractor: Extractor,
     ) -> Result<PriconneService> {
-        let extractor = Extractor {
-            tagger: RegexTagger { tag_rules: vec![] },
-        };
+        let chat_manager = Arc::new(chat_manager);
 
         Ok(Self {
             database,
@@ -113,7 +109,7 @@ impl PriconneService {
 
     pub async fn run_service(&self, kind: ResourceKind) -> Result<()> {
         match kind {
-            ResourceKind::Announce => {
+            ResourceKind::Information => {
                 let api_client = self.build_api_client().memorize(
                     self.database
                         .collection::<crate::resource::information::Announce>(&kind.to_string()),
@@ -142,8 +138,8 @@ impl PriconneService {
         Ok(())
     }
 
+    // TODO: This currently queries the announcement resource. In the future, we will have a dedicated
     /// List all incoming events
-    /// TODO: This currently queries the announcement resource. In the future, we will have a dedicated
     /// event collection.
     pub async fn incomming_events(&self) -> Result<Vec<Event>> {
         let collection = AnnouncementCollection(self.database.collection("announcement")).0;
@@ -178,6 +174,38 @@ impl PriconneService {
             })
             .try_concat()
             .await?)
+    }
+
+    /// Build scheduler
+    pub async fn add_jobs(self: Arc<Self>, sched: &JobScheduler) -> Result<()> {
+        let priconne = self;
+
+        for (kind, cron) in priconne.config.schedule.iter() {
+            let kind: ResourceKind = kind.parse()?;
+            // First clone (1): provide `priconne` for the following closure
+            let priconne = priconne.clone();
+            let run = move |_uuid: uuid::Uuid, _lock: JobScheduler| -> std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>> {
+                // Second clone (2) + move before clusoure: priconne(1) is moved to this closure
+                // But in order to make the closure `Fn` not `FnOnce`, it is borrowed and cloned here
+                // https://github.com/rust-lang/rust/issues/74497#issuecomment-1534485733
+                let kind = kind.clone();
+                let priconne = priconne.clone();
+                Box::pin(async move {
+                    priconne
+                        .run_service(kind)
+                        .await
+                        .map_err(|e| {
+                            tracing::error!("Error when running service: {}", e);
+                            // TODO: Send error message to chat or delete the job
+                        })
+                        .unwrap();
+                })
+            };
+            let job = Job::new_async(cron.clone(), run)?;
+            sched.add(job).await?;
+        }
+
+        Ok(())
     }
 }
 

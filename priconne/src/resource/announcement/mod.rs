@@ -8,9 +8,9 @@ pub mod news;
 pub mod service;
 
 use crate::{
+    chat::Sendable,
     client::ResourceResponse,
     insight::{AnnouncementInsight, AnnouncementPage, EventInAnnouncement},
-    message::Sendable,
     utils::map_title,
 };
 
@@ -81,11 +81,11 @@ impl Announcement {
 }
 
 impl Sendable for Announcement {
-    fn message(&self) -> crate::message::Message {
+    fn message(&self) -> crate::chat::Message {
         let data = self.data.last().unwrap();
         let text = data.build_message(self);
 
-        crate::message::Message {
+        crate::chat::Message {
             silent: false,
             text,
             image_src: None,
