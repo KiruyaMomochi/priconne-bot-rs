@@ -35,6 +35,9 @@ pub trait ResourceService<M> {
     async fn work(&self, priconne: &PriconneService, metadata: M) -> Result<()>
     where
         M: 'async_trait;
+    // TODO: Make it a trait on M?
+    /// Dry run
+    fn dry_work(&self, metadata: M);
 }
 
 // TODO: Since these values are cloned, we may want to use `Arc` instead. Or their mutation may not be reflected.
@@ -88,7 +91,11 @@ impl PriconneService {
         let latests = service.collect_latests(self).await;
 
         for result in latests? {
-            service.work(self, result).await?;
+            if self.config.dry_run {
+                service.dry_work(result);
+            } else {
+                service.work(self, result).await?;
+            }
         }
         Ok(())
     }

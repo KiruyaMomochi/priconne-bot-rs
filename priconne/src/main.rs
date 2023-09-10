@@ -68,7 +68,6 @@ async fn serve() -> priconne::Result<()> {
 
     let mut dispatcher = priconne::chat::dispatcher(&priconne, &priconne.chat_manager.bot);
 
-    // let mut stop_flag = Box::<dyn futures::Future<Output = ()>>::new(futures::future::pending());
     let mut stop_flag: Pin<Box<dyn futures::Future<Output = ()> + Send>> = Box::pin(async {
         tokio::signal::ctrl_c()
             .await
@@ -109,7 +108,7 @@ async fn serve() -> priconne::Result<()> {
     let sched = JobScheduler::new().await?;
     priconne.clone().add_jobs(&sched).await?;
     sched.shutdown_on_ctrl_c();
-    sched.start().await?;
+    sched.start().await?; // This immediately returns
 
     let ((), server_result) = tokio::join!(dispatcher, server);
     server_result?;

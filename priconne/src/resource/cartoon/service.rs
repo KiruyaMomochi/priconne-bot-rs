@@ -43,6 +43,9 @@ impl ResourceService<MetadataFindResult<Thumbnail>>
 
         Ok(())
     }
+    fn dry_work(&self, metadata: MetadataFindResult<Thumbnail>) {
+        tracing::info!("dry_run: work cartoon {}", metadata.item().title)
+    }
 }
 
 impl ResourceResponse for crate::resource::cartoon::CartoonPage {}

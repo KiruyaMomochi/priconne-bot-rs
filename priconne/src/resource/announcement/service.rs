@@ -156,6 +156,14 @@ where
 
         Ok(())
     }
+
+    fn dry_work(&self, metadata: MetadataFindResult<M>) {
+        tracing::info!(
+            "dry_run: work {} {}",
+            metadata.item().kind(),
+            metadata.item().title()
+        )
+    }
 }
 
 /// Use information about a resource to find action to take

@@ -55,6 +55,9 @@ pub struct FetchConfig {
     pub schedule: HashMap<String, Vec<String>>,
     /// Fetch strategy
     pub strategy: StrategyConfig,
+    /// Dry run only
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
